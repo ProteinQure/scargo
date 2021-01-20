@@ -1,0 +1,29 @@
+[tool.black]
+line-length = 120
+target-version = ["py38"]
+
+
+[tool.poetry]
+name = "scargo"
+version = "0.0.1"
+description = "Code for scargo project."
+authors = ["ProteinQure team <team@proteinqure.com>"]
+license = "Proprietary"
+
+
+[[tool.poetry.source]]
+name = "ProteinQure"
+url = "https://pypi.proteinqure.com/simple"
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.1.2"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

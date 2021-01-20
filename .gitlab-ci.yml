@@ -1,0 +1,77 @@
+stages:
+  - static-analysis
+  - test
+  - publish
+  - release
+
+variables:
+  DOCKER_REGISTRY: proteinqure
+  CI_RUNNER_IMAGE: $DOCKER_REGISTRY/basic-ci:stable
+
+.rules:
+  build: &build-rules
+    - if: '$CI_COMMIT_TAG == null && $CI_COMMIT_BRANCH != "master" && $CI_PIPELINE_SOURCE == "push"'
+    # also build suffixed tags as part of this pipeline.
+    - if: '$CI_COMMIT_TAG =~ /-.+$/'
+  release: &release-rules
+    # all tags but the ones that contain a suffix: 
+    - if: '$CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /-.+$/'
+    # merges and pushes to master
+    - if: '($CI_PIPELINE_SOURCE == "push" || $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result") && $CI_COMMIT_BRANCH == "master"'
+
+### JOBS ###
+
+black:
+  tags:
+    - cloud
+  stage: static-analysis
+  rules: *build-rules
+  image: $CI_RUNNER_IMAGE
+  script:
+    - black --version
+    - black --line-length 120 --check scargo/
+  allow_failure: true
+
+lint:
+  tags:
+    - cloud
+  stage: static-analysis
+  rules: *build-rules
+  image: $CI_RUNNER_IMAGE
+  script:
+    - flake8 scargo/
+    - pylint scargo/ --rcfile=setup.cfg --output-format=colorized
+  allow_failure: true
+
+test:
+  tags:
+    - cloud
+  stage: test
+  rules: *build-rules
+  image: $CI_RUNNER_IMAGE
+  script:
+    - poetry install
+    - pytest -vvv
+
+
+# - publishing of dev builds happens on every build, and versioning is dynamic
+# - publishing of release builds happens on tagged release, and uses the version specified by the release tag.
+publish-dev-package:
+  image: $CI_RUNNER_IMAGE
+  stage: publish
+  rules: *build-rules
+  script:
+    # Version format MUST be standards-compliant: https://www.python.org/dev/peps/pep-0440/#local-version-identifiers
+    - VERSION=$(dunamai from git --format "{base}+{distance}.{commit}" --style pep440)
+    - poetry version $VERSION
+    - poetry build
+    - poetry publish -r proteinqure
+
+release-package:
+  image: $CI_RUNNER_IMAGE
+  stage: release
+  rules: *release-rules
+  script:
+    - poetry version $CI_COMMIT_TAG
+    - poetry build
+    - poetry publish -r proteinqure
