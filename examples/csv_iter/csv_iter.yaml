@@ -1,0 +1,229 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: scargo-
+spec:
+  serviceAccountName: argo
+  imagePullSecrets:
+    - name: docker-hub
+  hostNetwork: true
+  podDisruptionBudget:
+    minAvailable: 99999
+  podGC:
+    strategy: OnPodSuccess
+  volumes:
+    - name: workdir
+      emptyDir: {}
+
+  # Affinity rules ensure that pods gravitate towards the nodes that can support them
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 10
+          preference:
+            matchExpressions:
+              - key: proteinqure/project
+                operator: In
+                values:
+                  - "{{workflow.namespace}}"
+        - weight: 5
+          preference:
+            matchExpressions:
+              - key: proteinqure/optimized
+                operator: In
+                values:
+                  - "{{workflow.parameters.optimized}}"
+  tolerations:
+    - key: proteinqure/project
+      value: "{{workflow.namespace}}"
+      operator: Equal
+      effect: NoSchedule
+
+  arguments:
+    parameters:
+      - name: project
+        value: "{{workflow.namespace}}"
+      - name: input-s3-bucket
+        value: "pq-proj-{{workflow.parameters.project}}"
+      - name: input-s3-path
+        value: scargo/inputs
+      - name: input-csv
+        value: input_csv.csv
+        # By default we'll write to the same S3 bucket and path, but this may be overridden
+      - name: output-s3-bucket
+        value: "{{workflow.parameters.input-s3-bucket}}"
+      - name: output-s3-path
+        value: "{{workflow.parameters.input-s3-path}}/scargo/outputs"
+      - name: optimized
+        # valid values are `cpu`, `memory`
+        value: cpu
+
+  entrypoint: main
+
+  templates:
+    - name: main
+      steps:
+        - - name: get-inputs
+            # Produces the complete set of work units from the initial input
+            template: split-csv
+            arguments:
+              artifacts:
+                - name: csv-file
+                  s3:
+                    endpoint: s3.amazonaws.com
+                    region: us-east-2
+                    bucket: "{{workflow.parameters.input-s3-bucket}}"
+                    key: "{{workflow.parameters.input-s3-path}}/{{workflow.parameters.input-csv}}"
+                    accessKeySecret:
+                      name: s3-access-user-creds
+                      key: accessKeySecret
+                    secretKeySecret:
+                      name: s3-access-user-creds
+                      key: secretKeySecret
+
+        - - name: process-each
+            # Iterates over the a set of work units produced by the previous step
+            template: compute-one
+            arguments:
+              parameters:
+                - name: index
+                  value: "{{item}}"
+              artifacts:
+                - name: mappings
+                  from: "{{steps.get-inputs.outputs.artifacts.json-data}}"
+            withSequence:
+              count: "{{steps.get-inputs.outputs.parameters.length}}"
+
+    - name: compute-one
+      # Processes a single work unit
+      inputs:
+        parameters:
+          - name: index
+        artifacts:
+          - name: mappings
+      steps:
+        - - name: get-work-item
+            # Retrieves the artifact references (PDB name, sequence) that are required to process a single unit of work
+            template: get-work-item
+            arguments:
+              parameters:
+                - name: index
+                  value: "{{inputs.parameters.index}}"
+              artifacts:
+                - name: mappings
+                  from: "{{inputs.artifacts.mappings}}"
+
+        - - name: add-alpha-compute
+            template: exec-add-alpha
+            arguments:
+              parameters:
+                - name: init-value
+                  value: "{{steps.get-work-item.outputs.parameters.command-arg}}"
+
+    - name: get-work-item
+      # From a given JSON array, get the item at `index`, which is expected to be an object,
+      # and output the values of its 'filename' and 'sequence' keys
+      inputs:
+        parameters:
+          - name: index
+        artifacts:
+          - name: mappings
+            path: /tmp/mappings.json
+      outputs:
+        parameters:
+          - name: command-arg
+            valueFrom:
+              path: /tmp/command-arg
+      script:
+        image: stedolan/jq
+        command: [sh]
+        source: |
+          jq -r '.[{{inputs.parameters.index}}].commandarg' {{inputs.artifacts.mappings.path}} > {{outputs.parameters.command-arg.path}}
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
+
+    - name: split-csv
+      # Given a CSV file, convert each row into a JSON-formatted object,
+      # and output the list all resulting objects as an artifact,
+      # and the length of this list as a parameter
+      inputs:
+        artifacts:
+          - name: csv-file
+            path: /tmp/input.csv
+      script:
+        image: python:alpine
+        command: [python]
+        source: |
+          from csv import reader
+          import json
+
+          with open("{{inputs.artifacts.csv-file.path}}", "r") as f:
+            rows = reader(f)
+            next(rows)
+            data = [ {"commandtype": r[0], "commandarg": r[1]} for r in list(rows) ]
+
+          with open("{{outputs.artifacts.json-data.path}}", "w") as f:
+            f.write(json.dumps(data))
+
+          with open("{{outputs.parameters.length.path}}", "w") as f:
+            f.write(str(len(data)))
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
+      outputs:
+        parameters:
+          - name: length
+            valueFrom:
+              path: /tmp/length
+        artifacts:
+          - name: json-data
+            path: /tmp/data.json
+
+    - name: exec-add-alpha
+      inputs:
+        parameters:
+          - name: init-value
+      outputs:
+        artifacts:
+          - name: txt-out
+            path: /workdir/out
+            archive:
+              none: {}
+            s3:
+              endpoint: s3.amazonaws.com
+              bucket: "{{workflow.parameters.output-s3-bucket}}"
+              key: "{{workflow.parameters.output-s3-path}}"
+              accessKeySecret:
+                name: s3-access-user-creds
+                key: accessKeySecret
+              secretKeySecret:
+                name: s3-access-user-creds
+                key: secretKeySecret
+      script:
+        image: python:alpine
+        command: [python]
+        source: |
+          import subprocess
+
+          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
+          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
+
+          with open("{{outputs.artifacts.txt-out.path}}/add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write(str({{inputs.parameters.init-value}}) + "a")
+
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
