@@ -269,8 +269,10 @@ spec:
           subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
           subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
 
+          result = str({{inputs.parameters.init-value}} + 2)
+
           with open("{{outputs.artifacts.txt-out.path}}/add_two_{{inputs.parameters.init-value}}.txt", "w+") as fi:
-              fi.write(str({{inputs.parameters.init-value}} + 2))
+              fi.write(result)
 
         resources:
           requests:
