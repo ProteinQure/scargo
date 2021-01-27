@@ -1,0 +1,5 @@
+input-val: "m_s_w_c"
+input-type: "alpha"
+
+output-s3-bucket: pq-dataxfer-tmp
+output-s3-path: testing/scargo-examples/output

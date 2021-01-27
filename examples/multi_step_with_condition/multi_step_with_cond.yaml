@@ -1,0 +1,155 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: scargo-
+spec:
+  serviceAccountName: argo
+  imagePullSecrets:
+    - name: docker-hub
+  hostNetwork: true
+  podDisruptionBudget:
+    minAvailable: 99999
+  podGC:
+    strategy: OnPodSuccess
+  volumes:
+    - name: workdir
+      emptyDir: {}
+
+  # Affinity rules ensure that pods gravitate towards the nodes that can support them
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 10
+          preference:
+            matchExpressions:
+              - key: proteinqure/project
+                operator: In
+                values:
+                  - "{{workflow.namespace}}"
+        - weight: 5
+          preference:
+            matchExpressions:
+              - key: proteinqure/optimized
+                operator: In
+                values:
+                  - "{{workflow.parameters.optimized}}"
+  tolerations:
+    - key: proteinqure/project
+      value: "{{workflow.namespace}}"
+      operator: Equal
+      effect: NoSchedule
+
+  arguments:
+    parameters:
+      - name: input-val
+        value: "1"
+      - name: input-type
+        value: alpha
+      - name: output-s3-bucket
+        value: pq-dataxfer-tmp
+      - name: output-s3-path
+        value: "{{workflow.parameters.output-s3-path}}/scargo/outputs"
+      - name: optimized
+        # valid values are `cpu`, `memory`
+        value: cpu
+
+
+  entrypoint: main
+
+  templates:
+    - name: main
+      steps:
+        - - name: add-alpha-compute
+            template: exec-add-alpha
+            arguments:
+              parameters:
+                - name: init-value
+                  value: "{{workflow.parameters.input-val}}"
+            when: "{{workflow.parameters.input-type}} == alpha"
+          - name: add-beta-compute
+            template: exec-add-beta
+            arguments:
+              parameters:
+                - name: init-value
+                  value: "{{workflow.parameters.input-val}}"
+            when: "{{workflow.parameters.input-type}} == beta"
+
+    - name: exec-add-alpha
+      inputs:
+        parameters:
+          - name: init-value
+      outputs:
+        artifacts:
+          - name: txt-out
+            path: /workdir/out
+            archive:
+              none: {}
+            s3:
+              endpoint: s3.amazonaws.com
+              bucket: "{{workflow.parameters.output-s3-bucket}}"
+              key: "{{workflow.parameters.output-s3-path}}"
+              accessKeySecret:
+                name: s3-access-user-creds
+                key: accessKeySecret
+              secretKeySecret:
+                name: s3-access-user-creds
+                key: secretKeySecret
+      script:
+        image: python:alpine
+        command: [python]
+        source: |
+          import subprocess
+
+          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
+          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
+
+          with open("{{outputs.artifacts.txt-out.path}}/add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write("{{inputs.parameters.init-value}})" + "a")
+
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
+
+    - name: exec-add-beta
+      inputs:
+        parameters:
+          - name: init-value
+      outputs:
+        artifacts:
+          - name: txt-out
+            path: /workdir/out
+            archive:
+              none: {}
+            s3:
+              endpoint: s3.amazonaws.com
+              bucket: "{{workflow.parameters.output-s3-bucket}}"
+              key: "{{workflow.parameters.output-s3-path}}"
+              accessKeySecret:
+                name: s3-access-user-creds
+                key: accessKeySecret
+              secretKeySecret:
+                name: s3-access-user-creds
+                key: secretKeySecret
+      script:
+        image: python:alpine
+        command: [python]
+        source: |
+          import subprocess
+
+          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
+          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
+
+          with open("{{outputs.artifacts.txt-out.path}}/add_beta_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write("{{inputs.parameters.init-value}})" + "b")
+
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
