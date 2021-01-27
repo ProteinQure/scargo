@@ -41,13 +41,12 @@ spec:
 
   arguments:
     parameters:
-      - name: project
-        value: "{{workflow.namespace}}"
-        # By default we'll write to the same S3 bucket and path, but this may be overridden
+      - name: input-val
+        value: "1"
       - name: output-s3-bucket
-        value: "{{workflow.parameters.input-s3-bucket}}"
+        value: pq-dataxfer-tmp
       - name: output-s3-path
-        value: "{{workflow.parameters.input-s3-path}}/scargo/outputs"
+        value: "{{workflow.parameters.output-s3-path}}/scargo/outputs"
       - name: optimized
         # valid values are `cpu`, `memory`
         value: cpu
@@ -62,44 +61,28 @@ spec:
             arguments:
               parameters:
                 - name: init-value
-                  value: "{{steps.get-work-item.outputs.parameters.command-arg}}"
+                  value: "{{workflow.parameters.input-val}}"
         - - name: add-beta-compute
             template: exec-add-beta
             arguments:
               parameters:
                 - name: init-value
-                  value: "{{steps.add-alpha-compute.outputs.parameters.command-arg}}"
+                  value: "{{steps.add-alpha-compute.outputs.parameters.out-val}}"
 
     - name: exec-add-alpha
       inputs:
         parameters:
           - name: init-value
       outputs:
-        artifacts:
-          - name: txt-out
-            path: /workdir/out
-            archive:
-              none: {}
-            s3:
-              endpoint: s3.amazonaws.com
-              bucket: "{{workflow.parameters.output-s3-bucket}}"
-              key: "{{workflow.parameters.output-s3-path}}"
-              accessKeySecret:
-                name: s3-access-user-creds
-                key: accessKeySecret
-              secretKeySecret:
-                name: s3-access-user-creds
-                key: secretKeySecret
+        parameters:
+          - name: out-val
+            valueFrom:
+              path: /tmp/add_alpha.txt
       script:
         image: python:alpine
         command: [python]
         source: |
-          import subprocess
-
-          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
-          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
-
-          with open("{{outputs.artifacts.txt-out.path}}/add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+          with open("{{outputs.parameters.out-val.path}}", "w+") as fi:
               fi.write(str({{inputs.parameters.init-value}}) + "a")
 
         resources:
@@ -139,8 +122,8 @@ spec:
           subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
           subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
 
-          with open("{{outputs.artifacts.txt-out.path}}/add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
-              fi.write(str({{inputs.parameters.init-value}}) + "a")
+          with open("{{outputs.artifacts.txt-out.path}}/multi_step_add_beta_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write("{{inputs.parameters.init-value}}" + "b")
 
         resources:
           requests:
