@@ -1,0 +1,6 @@
+input-s3-bucket: pq-dataxfer-tmp
+input-s3-path: testing/scargo-examples
+input-csv: add_numbers.csv
+
+output-s3-bucket: pq-dataxfer-tmp
+output-s3-path: testing/scargo-examples/output

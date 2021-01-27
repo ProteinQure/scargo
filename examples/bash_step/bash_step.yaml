@@ -1,0 +1,120 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: scargo-
+spec:
+  serviceAccountName: argo
+  imagePullSecrets:
+    - name: docker-hub
+  hostNetwork: true
+  podDisruptionBudget:
+    minAvailable: 99999
+  podGC:
+    strategy: OnPodSuccess
+  volumes:
+    - name: workdir
+      emptyDir: {}
+
+  # Affinity rules ensure that pods gravitate towards the nodes that can support them
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 10
+          preference:
+            matchExpressions:
+              - key: proteinqure/project
+                operator: In
+                values:
+                  - "{{workflow.namespace}}"
+        - weight: 5
+          preference:
+            matchExpressions:
+              - key: proteinqure/optimized
+                operator: In
+                values:
+                  - "{{workflow.parameters.optimized}}"
+  tolerations:
+    - key: proteinqure/project
+      value: "{{workflow.namespace}}"
+      operator: Equal
+      effect: NoSchedule
+
+  arguments:
+    parameters:
+      - name: project
+        value: "{{workflow.namespace}}"
+      - name: input-s3-bucket
+        value: "pq-proj-{{workflow.parameters.project}}"
+      - name: input-s3-path
+        value: scargo/inputs
+      - name: input-csv
+        value: input_csv.csv
+        # By default we'll write to the same S3 bucket and path, but this may be overridden
+      - name: output-s3-bucket
+        value: "{{workflow.parameters.input-s3-bucket}}"
+      - name: output-s3-path
+        value: "{{workflow.parameters.input-s3-path}}/scargo/outputs"
+      - name: optimized
+        # valid values are `cpu`, `memory`
+        value: cpu
+
+  entrypoint: main
+
+  templates:
+    - name: main
+      steps:
+        - - name: get-first-col
+            template: exec-get-first-col
+            arguments:
+              artifacts:
+                - name: csv-file
+                  s3:
+                    endpoint: s3.amazonaws.com
+                    region: us-east-2
+                    bucket: "{{workflow.parameters.input-s3-bucket}}"
+                    key: "{{workflow.parameters.input-s3-path}}/{{workflow.parameters.input-csv}}"
+                    accessKeySecret:
+                      name: s3-access-user-creds
+                      key: accessKeySecret
+                    secretKeySecret:
+                      name: s3-access-user-creds
+                      key: secretKeySecret
+
+    - name: exec-get-first-col
+      inputs:
+        artifacts:
+          - name: csv-file
+            path: /tmp/input.csv
+      outputs:
+        artifacts:
+          - name: txt-out
+            path: /workdir/out
+            archive:
+              none: {}
+            s3:
+              endpoint: s3.amazonaws.com
+              bucket: "{{workflow.parameters.output-s3-bucket}}"
+              key: "{{workflow.parameters.output-s3-path}}"
+              accessKeySecret:
+                name: s3-access-user-creds
+                key: accessKeySecret
+              secretKeySecret:
+                name: s3-access-user-creds
+                key: secretKeySecret
+      script:
+        image: fedora:33
+        command: [bash]
+        source: |
+          set -xe
+
+          mkdir -p {{outputs.artifacts.txt-out.path}}
+          cat {{inputs.artifacts.csv-file.path}} | cut -d ',' -f 1 > {{outputs.artifacts.txt-out.path}}/command-types.txt
+
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
+
