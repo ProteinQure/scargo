@@ -43,10 +43,10 @@ spec:
     parameters:
       - name: input-val
         value: "1"
-      - name: output-s3-bucket
+      - name: s3-bucket
         value: pq-dataxfer-tmp
-      - name: output-s3-path
-        value: "{{workflow.parameters.output-s3-path}}/scargo/outputs"
+      - name: output-path
+        value: testing/scargo-examples/output
       - name: optimized
         # valid values are `cpu`, `memory`
         value: cpu
@@ -75,8 +75,8 @@ spec:
               none: {}
             s3:
               endpoint: s3.amazonaws.com
-              bucket: "{{workflow.parameters.output-s3-bucket}}"
-              key: "{{workflow.parameters.output-s3-path}}"
+              bucket: "{{workflow.parameters.s3-bucket}}"
+              key: "{{workflow.parameters.output-path}}"
               accessKeySecret:
                 name: s3-access-user-creds
                 key: accessKeySecret

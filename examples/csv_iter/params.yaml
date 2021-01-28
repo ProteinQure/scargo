@@ -1,6 +1,5 @@
-input-s3-bucket: pq-dataxfer-tmp
-input-s3-path: testing/scargo-examples
+s3-bucket: pq-dataxfer-tmp
+input-path: testing/scargo-examples
+output-path: testing/scargo-examples/output
 input-csv: add_alpha.csv
 
-output-s3-bucket: pq-dataxfer-tmp
-output-s3-path: testing/scargo-examples/output
