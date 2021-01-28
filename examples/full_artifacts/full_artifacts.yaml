@@ -1,0 +1,190 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: scargo-
+spec:
+  serviceAccountName: argo
+  imagePullSecrets:
+    - name: docker-hub
+  hostNetwork: true
+  podDisruptionBudget:
+    minAvailable: 99999
+  podGC:
+    strategy: OnPodSuccess
+  volumes:
+    - name: workdir
+      emptyDir: {}
+
+  # Affinity rules ensure that pods gravitate towards the nodes that can support them
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 10
+          preference:
+            matchExpressions:
+              - key: proteinqure/project
+                operator: In
+                values:
+                  - "{{workflow.namespace}}"
+        - weight: 5
+          preference:
+            matchExpressions:
+              - key: proteinqure/optimized
+                operator: In
+                values:
+                  - "{{workflow.parameters.optimized}}"
+  tolerations:
+    - key: proteinqure/project
+      value: "{{workflow.namespace}}"
+      operator: Equal
+      effect: NoSchedule
+
+  arguments:
+    parameters:
+      - name: input-val
+        value: "1"
+      - name: pre-word
+        value: "pre"
+      - name: post-word
+        value: "post"
+      - name: num-alphas
+        value: "3"
+      - name: input-s3-bucket
+        value: pq-dataxfer-tmp
+      - name: input-s3-path
+        value: "scargo/inputs"
+      - name: input-csv
+        value: input_csv.csv
+      - name: output-s3-bucket
+        value: pq-dataxfer-tmp
+      - name: output-s3-path
+        value: "{{workflow.parameters.output-s3-path}}/scargo/outputs"
+      - name: optimized
+        # valid values are `cpu`, `memory`
+        value: cpu
+
+  entrypoint: main
+
+  templates:
+    - name: main
+      steps:
+        - - name: get-nth-word-compute
+            template: exec-get-nth-word
+            arguments:
+              parameters:
+                - name: word-index
+                  value: "{{workflow.parameters.input-val}}"
+              artifacts:
+                - name: csv-file
+                  s3:
+                    endpoint: s3.amazonaws.com
+                    region: us-east-2
+                    bucket: "{{workflow.parameters.input-s3-bucket}}"
+                    key: "{{workflow.parameters.input-s3-path}}/{{workflow.parameters.input-csv}}"
+                    accessKeySecret:
+                      name: s3-access-user-creds
+                      key: accessKeySecret
+                    secretKeySecret:
+                      name: s3-access-user-creds
+                      key: secretKeySecret
+
+        - - name: add-multi-alpha-compute
+            template: exec-add-multi-alpha
+            arguments:
+              parameters:
+                - name: init-value
+                  value: "{{steps.get-nth-word-compute.outputs.parameters.out-val}}"
+                - name: num-alphas
+                  value: "{{workflow.parameters.num-alphas}}"
+              artifacts:
+                - name: init-file
+                  from: "{{steps.get-nth-word-compute.outputs.artifacts.out-file}}"
+
+    - name: exec-get-nth-word
+      inputs:
+        parameters:
+          - name: word-index
+        artifacts:
+          - name: csv-file
+            path: /tmp/input.csv
+      outputs:
+        parameters:
+          - name: out-val
+            valueFrom:
+              path: /tmp/out-val.txt
+        artifacts:
+          - name: out-file
+            path: /tmp/out-file.txt
+      script:
+        image: python:alpine
+        command: [python]
+        source: |
+          with open("{{inputs.artifacts.csv-file.path}}", "r") as fi:
+              words = fi.readline().split(",")
+
+          word = words[int({{inputs.parameters.word-index}})]
+
+          with open("{{outputs.parameters.out-val.path}}", "w+") as fi:
+              fi.write(word)
+
+          with open("{{outputs.artifacts.out-file.path}}", "w+") as fi:
+              fi.write(f"{{workflow.parameters.pre-word}},{word},{{workflow.parameters.post-word}}")
+
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
+
+    - name: exec-add-multi-alpha
+      inputs:
+        parameters:
+          - name: init-value
+          - name: num-alphas
+        artifacts:
+          - name: init-file
+            path: /tmp/init-file.txt
+      outputs:
+        artifacts:
+          - name: txt-out
+            path: /workdir/out
+            archive:
+              none: {}
+            s3:
+              endpoint: s3.amazonaws.com
+              bucket: "{{workflow.parameters.output-s3-bucket}}"
+              key: "{{workflow.parameters.output-s3-path}}"
+              accessKeySecret:
+                name: s3-access-user-creds
+                key: accessKeySecret
+              secretKeySecret:
+                name: s3-access-user-creds
+                key: secretKeySecret
+      script:
+        image: python:alpine
+        command: [python]
+        source: |
+          import subprocess
+
+          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
+          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
+
+          with open("{{inputs.artifacts.init-file.path}}", "r") as fi:
+              prev_line = fi.readline()
+
+          alphas = {{inputs.parameters.num-alphas}} * "a"
+          new_word = alphas + "{{inputs.parameters.init-value}}" + alphas
+
+          with open("{{outputs.artifacts.txt-out.path}}/full_artifacts_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write(prev_line)
+              fi.write(f"{{workflow.parameters.pre-word}},{new_word},{{workflow.parameters.post-word}}")
+
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 20m
+          limits:
+            memory: 30Mi
+            cpu: 20m
