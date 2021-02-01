@@ -19,7 +19,7 @@ def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
     """
-    NO CSV?
+    Run a single Python step with an artifact output.
     """
 
     add_alpha(
