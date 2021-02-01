@@ -46,7 +46,7 @@ mount_points = MountPoints(
     {
         "root": MountPoint(
             local=Path("~/s3-data/scargo-examples"),
-            remote=f"s3://{workflow_parameters['s3-bucket']}/{workflow_parameters['input-path']}",
+            remote=f"s3://{workflow_parameters['s3-bucket']}",
         )
     }
 )
