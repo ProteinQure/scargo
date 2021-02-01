@@ -84,7 +84,7 @@ spec:
       inputs:
         artifacts:
           - name: csv-file
-            path: /tmp/input.csv
+            path: /workdir/in/input.csv
       outputs:
         artifacts:
           - name: txt-out
@@ -101,13 +101,21 @@ spec:
               secretKeySecret:
                 name: s3-access-user-creds
                 key: secretKeySecret
+      initContainers:
+        - name: mkdir
+          image: alpine:latest
+          command: ["mkdir", "-p", "/workdir/out", "/workdir/in"]
+          mirrorVolumeMounts: true
+        - name: chmod
+          image: alpine:latest
+          command: ["chmod", "-R", "a+rwX", "/workdir"]
+          mirrorVolumeMounts: true
       script:
         image: fedora:33
         command: [bash]
         source: |
           set -xe
 
-          mkdir -p {{outputs.artifacts.txt-out.path}}
           cat {{inputs.artifacts.csv-file.path}} | cut -d ',' -f 1 > {{outputs.artifacts.txt-out.path}}/command-types.txt
 
         resources:
@@ -117,4 +125,6 @@ spec:
           limits:
             memory: 30Mi
             cpu: 20m
-
+        volumeMounts:
+          - name: workdir
+            mountPath: /workdir

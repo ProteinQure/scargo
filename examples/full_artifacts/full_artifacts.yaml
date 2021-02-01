@@ -119,10 +119,11 @@ spec:
       initContainers:
         - name: mkdir
           image: alpine:latest
-          command: ["bash"]
-          source: | 
-            mkdir -p {{outputs.artifacts.out-file.path}}
-            chmod -R {{outputs.artifacts.out-file.path}}
+          command: ["mkdir", "-p", "/workdir/out", "/workdir/in"]
+          mirrorVolumeMounts: true
+        - name: chmod
+          image: alpine:latest
+          command: ["chmod", "-R", "a+rwX", "/workdir"]
           mirrorVolumeMounts: true
       script:
         image: python:alpine
@@ -146,11 +147,11 @@ spec:
           limits:
             memory: 30Mi
             cpu: 20m
+        volumeMounts:
+          - name: workdir
+            mountPath: /workdir
 
     - name: exec-add-multi-alpha
-      volumeMounts:
-        - name: workdir
-          mountPath: /workdir
       inputs:
         parameters:
           - name: init-value
@@ -177,10 +178,11 @@ spec:
       initContainers:
         - name: mkdir
           image: alpine:latest
-          command: ["bash"]
-          source: | 
-            mkdir -p {{outputs.artifacts.txt-out.path}}
-            chmod -R {{outputs.artifacts.txt-out.path}}
+          command: ["mkdir", "-p", "/workdir/out", "/workdir/in"]
+          mirrorVolumeMounts: true
+        - name: chmod
+          image: alpine:latest
+          command: ["chmod", "-R", "a+rwX", "/workdir"]
           mirrorVolumeMounts: true
       script:
         image: python:alpine
@@ -203,3 +205,6 @@ spec:
           limits:
             memory: 30Mi
             cpu: 20m
+        volumeMounts:
+          - name: workdir
+            mountPath: /workdir

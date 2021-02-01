@@ -83,15 +83,19 @@ spec:
               secretKeySecret:
                 name: s3-access-user-creds
                 key: secretKeySecret
+      initContainers:
+        - name: mkdir
+          image: alpine:latest
+          command: ["mkdir", "-p", "/workdir/out"]
+          mirrorVolumeMounts: true
+        - name: chmod
+          image: alpine:latest
+          command: ["chmod", "-R", "a+rwX", "/workdir"]
+          mirrorVolumeMounts: true
       script:
         image: python:alpine
         command: [python]
         source: |
-          import subprocess
-
-          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
-          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
-
           with open("{{outputs.artifacts.txt-out.path}}/python_step_add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
               fi.write(str({{inputs.parameters.init-value}}) + "a")
 
@@ -102,3 +106,6 @@ spec:
           limits:
             memory: 30Mi
             cpu: 20m
+        volumeMounts:
+          - name: workdir
+            mountPath: /workdir

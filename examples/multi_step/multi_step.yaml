@@ -77,7 +77,16 @@ spec:
         parameters:
           - name: out-val
             valueFrom:
-              path: /tmp/add_alpha.txt
+              path: /workdir/out/add_alpha.txt
+      initContainers:
+        - name: mkdir
+          image: alpine:latest
+          command: ["mkdir", "-p", "/workdir/out"]
+          mirrorVolumeMounts: true
+        - name: chmod
+          image: alpine:latest
+          command: ["chmod", "-R", "a+rwX", "/workdir"]
+          mirrorVolumeMounts: true
       script:
         image: python:alpine
         command: [python]
@@ -92,6 +101,9 @@ spec:
           limits:
             memory: 30Mi
             cpu: 20m
+        volumeMounts:
+          - name: workdir
+            mountPath: /workdir
 
     - name: exec-add-beta
       inputs:
@@ -113,15 +125,19 @@ spec:
               secretKeySecret:
                 name: s3-access-user-creds
                 key: secretKeySecret
+      initContainers:
+        - name: mkdir
+          image: alpine:latest
+          command: ["mkdir", "-p", "/workdir/out"]
+          mirrorVolumeMounts: true
+        - name: chmod
+          image: alpine:latest
+          command: ["chmod", "-R", "a+rwX", "/workdir"]
+          mirrorVolumeMounts: true
       script:
         image: python:alpine
         command: [python]
         source: |
-          import subprocess
-
-          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
-          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
-
           with open("{{outputs.artifacts.txt-out.path}}/multi_step_add_beta_{{inputs.parameters.init-value}}.txt", "w+") as fi:
               fi.write("{{inputs.parameters.init-value}}" + "b")
 
@@ -132,3 +148,6 @@ spec:
           limits:
             memory: 30Mi
             cpu: 20m
+        volumeMounts:
+          - name: workdir
+            mountPath: /workdir
