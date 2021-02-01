@@ -40,6 +40,7 @@ spec:
       effect: NoSchedule
 
   arguments:
+    parameters:
       - name: s3-bucket
         value: pq-dataxfer-tmp
       - name: input-path
