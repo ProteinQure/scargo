@@ -1,5 +1,5 @@
-from scargo.core import MountPoint
 from typing import Dict, NamedTuple, Optional
+from scargo.core import MountPoint
 
 
 class FileInput(NamedTuple):
@@ -9,6 +9,7 @@ class FileInput(NamedTuple):
 
     def open(self):
         pass
+
 
 class FileOutput(NamedTuple):
     root: MountPoint
@@ -22,7 +23,7 @@ class FileOutput(NamedTuple):
             else:
                 self.name = file_name
         elif file_name is not None:
-                raise ValueError("Trying to overwrite name")
+            raise ValueError("Trying to overwrite name")
 
         pass
 

@@ -3,6 +3,7 @@ Decorators that reduce the amount of boilerplate code required from the user
 when writing Scargo scripts.
 """
 
+
 def scargo(image):
     """
     A decorator factory taking a Docker `image` name as argument. Every Python
@@ -17,7 +18,7 @@ def scargo(image):
         """
 
         def wrapped_function(scargo_inputs, scargo_outputs):
-                function(scargo_inputs, scargo_outputs)
+            function(scargo_inputs, scargo_outputs)
 
         return wrapped_function
 
@@ -25,8 +26,7 @@ def scargo(image):
 
 
 def entrypoint(func):
-
     def decorator():
         return func()
-    
+
     return decorator
