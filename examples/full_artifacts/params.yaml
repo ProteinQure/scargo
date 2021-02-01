@@ -3,9 +3,7 @@ pre-word: "pre"
 post-word: "post"
 num-alphas: "3"
 
-input-s3-bucket: pq-dataxfer-tmp
-input-s3-path: testing/scargo-examples
+s3-bucket: pq-dataxfer-tmp
+input-path: testing/scargo-examples
 input-csv: add_numbers.csv
-
-output-s3-bucket: pq-dataxfer-tmp
-output-s3-path: testing/scargo-examples/output
+output-path: testing/scargo-examples/output

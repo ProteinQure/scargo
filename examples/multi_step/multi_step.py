@@ -1,43 +1,64 @@
 from pathlib import Path
-from typing import Dict
 
-from scargo.decorators import scargo
-from scargo.functions import write_txt
-from scargo.items import ScargoInput, ScargoOutput
-
-
-@scargo(image="proteinqure/scargo")
-def add_alpha(scargo_in: ScargoInput) -> ScargoOutput:
-    """
-    Appends the character "a" to the "value" in `scargo_in`.
-    """
-    output = ScargoOutput(parameters={"result": str(scargo_in.parameters["value"]) + "a"}, artifacts=None)
-    return output
+from scargo.decorators import scargo, entrypoint
+from scargo.args import FileOutput, ScargoInput, ScargoOutput
+from scargo.core import WorkflowParams, MountPoint, MountPoints
 
 
 @scargo(image="proteinqure/scargo")
-def add_beta(scargo_in: ScargoInput) -> ScargoOutput:
+def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
+    """
+    Appends to the character "a" to the "value" in `scargo_in`.
+    """
+    scargo_out.parameters["out-value"] = str(scargo_in.parameters["init-value"]) + "a"
+
+
+@scargo(image="proteinqure/scargo")
+def add_beta(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends the character "b" to the "value" in `scargo_in`.
     """
-    output = ScargoOutput(parameters={"result": str(scargo_in.parameters["value"]) + "b"}, artifacts=None)
-    return output
+    result = str(scargo_in.parameters["init-value"]) + "b"
+    with scargo_out.artifacts["txt-out"].open(f"add_beta_{scargo_in.parameters['init-value']}.txt") as fi:
+        fi.write(result)
 
 
-def main(workflow_params: Dict):
+@entrypoint
+def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
     """
-    Opening a CSV file and executing different functions based on the entries
-    in the CSV.
+    Run two Python steps with the result of the previous step being passed by a parameter.
     """
 
-    step_output = add_alpha(ScargoInput(parameters={"value": workflow_params["input_val"]}, artifacts=None))
-    step_output = add_beta(ScargoInput(parameters={"value": step_output.parameters["result"]}, artifacts=None))
-
-    write_txt(
-        step_output.parameters["result"], workflow_params["out_path"] / f"result_{workflow_params['input_name']}.txt"
+    alpha_out = ScargoOutput(parameters={"out-value": None})
+    add_alpha(ScargoInput(parameters={"init-value": workflow_parameters["input_val"]}), alpha_out)
+    add_beta(
+        ScargoInput(parameters={"value": alpha_out.parameters["out-value"]}),
+        ScargoOutput(
+            artifacts={
+                "txt-out": FileOutput(
+                    root=mount_points["root"],
+                    path=workflow_parameters["output-path"],
+                )
+            }
+        ),
     )
 
 
+workflow_parameters = WorkflowParams(
+    {
+        "input-val": "1",
+        "s3-bucket": "pq-dataxfer-tmp",
+        "output-path": "testing/scargo-examples/output",
+    }
+)
+mount_points = MountPoints(
+    {
+        "root": MountPoint(
+            local=Path("~/s3-data/scargo-examples"),
+            remote=f"s3://{workflow_parameters['s3-bucket']}",
+        )
+    }
+)
+
 if __name__ == "__main__":
-    params = {"input_val": 1, "input_name": "test", "input_type": "alpha", "out_path": Path.cwd()}
-    main(params)
+    main(mount_points, workflow_parameters)

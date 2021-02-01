@@ -49,16 +49,14 @@ spec:
         value: "post"
       - name: num-alphas
         value: "3"
-      - name: input-s3-bucket
+      - name: s3-bucket
         value: pq-dataxfer-tmp
-      - name: input-s3-path
-        value: "scargo/inputs"
+      - name: input-path
+        value: scargo/inputs
       - name: input-csv
         value: input_csv.csv
-      - name: output-s3-bucket
-        value: pq-dataxfer-tmp
-      - name: output-s3-path
-        value: "{{workflow.parameters.output-s3-path}}/scargo/outputs"
+      - name: output-path
+        value: testing/scargo-examples/output
       - name: optimized
         # valid values are `cpu`, `memory`
         value: cpu
@@ -79,8 +77,8 @@ spec:
                   s3:
                     endpoint: s3.amazonaws.com
                     region: us-east-2
-                    bucket: "{{workflow.parameters.input-s3-bucket}}"
-                    key: "{{workflow.parameters.input-s3-path}}/{{workflow.parameters.input-csv}}"
+                    bucket: "{{workflow.parameters.s3-bucket}}"
+                    key: "{{workflow.parameters.input-path}}/{{workflow.parameters.input-csv}}"
                     accessKeySecret:
                       name: s3-access-user-creds
                       key: accessKeySecret
@@ -101,20 +99,31 @@ spec:
                   from: "{{steps.get-nth-word-compute.outputs.artifacts.out-file}}"
 
     - name: exec-get-nth-word
+      volumeMounts:
+        - name: workdir
+          mountPath: /workdir
       inputs:
         parameters:
           - name: word-index
         artifacts:
           - name: csv-file
-            path: /tmp/input.csv
+            path: /workdir/in/input.csv
       outputs:
         parameters:
           - name: out-val
             valueFrom:
-              path: /tmp/out-val.txt
+              path: /workdir/out/out-val.txt
         artifacts:
           - name: out-file
-            path: /tmp/out-file.txt
+            path: /workdir/out/out-file.txt
+      initContainers:
+        - name: mkdir
+          image: alpine:latest
+          command: ["bash"]
+          source: | 
+            mkdir -p {{outputs.artifacts.out-file.path}}
+            chmod -R {{outputs.artifacts.out-file.path}}
+          mirrorVolumeMounts: true
       script:
         image: python:alpine
         command: [python]
@@ -139,13 +148,16 @@ spec:
             cpu: 20m
 
     - name: exec-add-multi-alpha
+      volumeMounts:
+        - name: workdir
+          mountPath: /workdir
       inputs:
         parameters:
           - name: init-value
           - name: num-alphas
         artifacts:
           - name: init-file
-            path: /tmp/init-file.txt
+            path: /workdir/in/init-file.txt
       outputs:
         artifacts:
           - name: txt-out
@@ -154,23 +166,26 @@ spec:
               none: {}
             s3:
               endpoint: s3.amazonaws.com
-              bucket: "{{workflow.parameters.output-s3-bucket}}"
-              key: "{{workflow.parameters.output-s3-path}}"
+              bucket: "{{workflow.parameters.s3-bucket}}"
+              key: "{{workflow.parameters.output-path}}"
               accessKeySecret:
                 name: s3-access-user-creds
                 key: accessKeySecret
               secretKeySecret:
                 name: s3-access-user-creds
                 key: secretKeySecret
+      initContainers:
+        - name: mkdir
+          image: alpine:latest
+          command: ["bash"]
+          source: | 
+            mkdir -p {{outputs.artifacts.txt-out.path}}
+            chmod -R {{outputs.artifacts.txt-out.path}}
+          mirrorVolumeMounts: true
       script:
         image: python:alpine
         command: [python]
         source: |
-          import subprocess
-
-          subprocess.run(["mkdir", "-p", "{{outputs.artifacts.txt-out.path}}"])
-          subprocess.run(["chmod", "-R", "a+rwX", "{{outputs.artifacts.txt-out.path}}"])
-
           with open("{{inputs.artifacts.init-file.path}}", "r") as fi:
               prev_line = fi.readline()
 
