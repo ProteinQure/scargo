@@ -17,7 +17,7 @@ def iter_csv(mount_point: MountPoint, csv_file: Path):
             yield line
 
 
-def run_bash_step(bash_template, scargo_inputs: ScargoInput, scargo_outputs: ScargoOutput) -> None:
+def run_bash_step(bash_template, scargo_input: ScargoInput, scargo_output: ScargoOutput) -> None:
     """
     Fill in the variables of a bash script, then run it
     """
