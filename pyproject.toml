@@ -18,6 +18,7 @@ url = "https://pypi.proteinqure.com/simple"
 
 [tool.poetry.dependencies]
 python = "^3.8"
+typer = "^0.3.2"
 
 
 [tool.poetry.dev-dependencies]
@@ -28,3 +29,7 @@ pytest-console-scripts = "^1.1.0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry.scripts]
+scargo = 'scargo.cli:run'
