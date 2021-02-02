@@ -57,6 +57,8 @@ test:
 # - publishing of dev builds happens on every build, and versioning is dynamic
 # - publishing of release builds happens on tagged release, and uses the version specified by the release tag.
 publish-dev-package:
+  tags:
+    - cloud
   image: $CI_RUNNER_IMAGE
   stage: publish
   rules: *build-rules
