@@ -33,7 +33,6 @@ class FileOutput(NamedTuple):
         return open(output_dir / output_file, "w+")
 
 
-# TODO: ScargoInput should be immutable, both input and output artifacts should have immutable fields
 class ScargoInput(NamedTuple):
     parameters: Optional[Dict] = None
     artifacts: Optional[Dict[str, FileInput]] = None
