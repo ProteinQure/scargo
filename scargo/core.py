@@ -5,7 +5,6 @@ from typing import Mapping, NamedTuple
 
 class MountPoint(NamedTuple):
     local: Path
-    # TODO: should actually have a type
     remote: str
 
 
