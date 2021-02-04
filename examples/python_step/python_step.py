@@ -1,8 +1,11 @@
-from scargo.paths import env_local_mountpoint
+"""
+Run a single Python step which generates a textfile artifact output.
+"""
 
 from scargo.decorators import scargo, entrypoint
 from scargo.args import FileOutput, ScargoInput, ScargoOutput
 from scargo.core import WorkflowParams, MountPoint, MountPoints
+from scargo.paths import env_local_mountpoint
 
 
 @scargo(image="proteinqure/scargo")
@@ -18,10 +21,6 @@ def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
-    """
-    Run a single Python step with an artifact output.
-    """
-
     add_alpha(
         ScargoInput(parameters={"init-value": workflow_parameters["input-val"]}),
         ScargoOutput(

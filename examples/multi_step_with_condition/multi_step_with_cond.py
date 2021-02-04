@@ -1,3 +1,7 @@
+"""
+Control flow chooses between two Python steps based on a workflow parameter.
+"""
+
 from scargo.decorators import scargo, entrypoint
 from scargo.args import FileOutput, ScargoInput, ScargoOutput
 from scargo.core import WorkflowParams, MountPoint, MountPoints
@@ -28,10 +32,6 @@ def add_beta(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
-    """
-    Choose between two steps based on a workflow parameter.
-    """
-
     step_input = ScargoInput(parameters={"init-value": workflow_parameters["input-val"]})
     step_output = ScargoOutput(
         artifacts={

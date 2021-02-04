@@ -1,14 +1,11 @@
 """
-Write a function with:
- - input artifacts
- - input parameters
- - output artifacts
- - output parameters
- - input parameter from workflow
+1. Read in a file and select the nth comma-separated word.
+2. Write this work to a file, but also pass it to the next step.
+3. The next step appends "a" to this word N times.
 
- # TODO: make this example less contrived
- # TODO: use the return parameter for the length instead
+Contrived example used to demonstrate full use of inputs/outputs, as well as parameters/artifacts.
 """
+
 from pathlib import Path
 
 from scargo.decorators import scargo, entrypoint
@@ -41,11 +38,6 @@ def add_multi_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
-    """
-    Read in a file and select the nth comma-separated word.
-    Write this work to a file, but also pass it to the next function.
-    The next function appends "a" to this word N times.
-    """
     nth_word_out = ScargoOutput(
         parameters={"out-value": None},
         artifacts={"out-file": FileOutput(root=mount_points["root"], path=workflow_parameters["output-path"], name="out-file.txt")},

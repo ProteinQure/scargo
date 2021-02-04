@@ -1,3 +1,7 @@
+"""
+Open a CSV file and execute different functions based on the csv row content.
+"""
+
 from pathlib import Path
 
 from scargo.decorators import scargo, entrypoint
@@ -29,18 +33,12 @@ def add_two(scargo_input: ScargoInput, scargo_output: ScargoOutput) -> None:
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
-    """
-    Opening a CSV file and executing different functions based on the entries
-    in the CSV.
-    """
-
     for csv_line in iter_csv(
         mount_points["root"], Path(workflow_parameters["inputs-path"], workflow_parameters["input-csv"])
     ):
         command_type = csv_line["command_type"]
         command_arg = csv_line["command_arg"]
 
-        # run either `add_one` or `add_two` depending on the `command_type` column
         input_items = ScargoInput(parameters={"init-value": int(command_arg)})
         output_items = ScargoOutput(
             artifacts={

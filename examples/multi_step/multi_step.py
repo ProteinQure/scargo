@@ -1,4 +1,6 @@
-from pathlib import Path
+"""
+Run two sequential Python steps with the result of the previous step being passed to the next by a parameter.
+"""
 
 from scargo.decorators import scargo, entrypoint
 from scargo.args import FileOutput, ScargoInput, ScargoOutput
@@ -26,10 +28,6 @@ def add_beta(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
-    """
-    Run two Python steps with the result of the previous step being passed by a parameter.
-    """
-
     alpha_out = ScargoOutput(parameters={"out-value": None})
     add_alpha(ScargoInput(parameters={"init-value": workflow_parameters["input-val"]}), alpha_out)
     add_beta(

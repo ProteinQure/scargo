@@ -1,3 +1,7 @@
+"""
+Open a CSV file and execute a function per row.
+"""
+
 from pathlib import Path
 
 from scargo.decorators import scargo, entrypoint
@@ -18,9 +22,6 @@ def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
-    """
-    Opening a CSV file and executing a function per row.
-    """
     for csv_line in iter_csv(
         mount_points["root"], Path(workflow_parameters["input-path"], workflow_parameters["input-csv"])
     ):

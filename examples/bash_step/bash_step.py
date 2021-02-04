@@ -1,3 +1,7 @@
+"""
+Run a single bash step which generates a textfile artifact output.
+"""
+
 from pathlib import Path
 
 from scargo.decorators import entrypoint
