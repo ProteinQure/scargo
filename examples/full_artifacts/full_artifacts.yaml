@@ -1,43 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: scargo-
+  generateName: scargo-full-artifacts-
 spec:
-  serviceAccountName: argo
-  imagePullSecrets:
-    - name: docker-hub
-  hostNetwork: true
-  podDisruptionBudget:
-    minAvailable: 99999
-  podGC:
-    strategy: OnPodSuccess
   volumes:
     - name: workdir
       emptyDir: {}
-
-  # Affinity rules ensure that pods gravitate towards the nodes that can support them
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 10
-          preference:
-            matchExpressions:
-              - key: proteinqure/project
-                operator: In
-                values:
-                  - "{{workflow.namespace}}"
-        - weight: 5
-          preference:
-            matchExpressions:
-              - key: proteinqure/optimized
-                operator: In
-                values:
-                  - "{{workflow.parameters.optimized}}"
-  tolerations:
-    - key: proteinqure/project
-      value: "{{workflow.namespace}}"
-      operator: Equal
-      effect: NoSchedule
 
   arguments:
     parameters:
@@ -76,15 +44,8 @@ spec:
                 - name: csv-file
                   s3:
                     endpoint: s3.amazonaws.com
-                    region: us-east-2
                     bucket: "{{workflow.parameters.s3-bucket}}"
                     key: "{{workflow.parameters.input-path}}/{{workflow.parameters.input-csv}}"
-                    accessKeySecret:
-                      name: s3-access-user-creds
-                      key: accessKeySecret
-                    secretKeySecret:
-                      name: s3-access-user-creds
-                      key: secretKeySecret
 
         - - name: add-multi-alpha-compute
             template: exec-add-multi-alpha
@@ -99,9 +60,6 @@ spec:
                   from: "{{steps.get-nth-word-compute.outputs.artifacts.out-file}}"
 
     - name: exec-get-nth-word
-      volumeMounts:
-        - name: workdir
-          mountPath: /workdir
       inputs:
         parameters:
           - name: word-index
@@ -169,12 +127,6 @@ spec:
               endpoint: s3.amazonaws.com
               bucket: "{{workflow.parameters.s3-bucket}}"
               key: "{{workflow.parameters.output-path}}"
-              accessKeySecret:
-                name: s3-access-user-creds
-                key: accessKeySecret
-              secretKeySecret:
-                name: s3-access-user-creds
-                key: secretKeySecret
       initContainers:
         - name: mkdir
           image: alpine:latest
