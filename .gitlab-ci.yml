@@ -14,7 +14,7 @@ variables:
     # also build suffixed tags as part of this pipeline.
     - if: '$CI_COMMIT_TAG =~ /-.+$/'
   release: &release-rules
-    # all tags but the ones that contain a suffix: 
+    # all tags but the ones that contain a suffix:
     - if: '$CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /-.+$/'
     # merges and pushes to master
     - if: '($CI_PIPELINE_SOURCE == "push" || $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result") && $CI_COMMIT_BRANCH == "master"'
@@ -51,7 +51,11 @@ test:
   image: $CI_RUNNER_IMAGE
   script:
     - poetry install
-    - pytest -vvv
+    - coverage run -m pytest -vvv .
+    - coverage xml
+  artifacts:
+    reports:
+      cobertura: coverage.xml
 
 
 # - publishing of dev builds happens on every build, and versioning is dynamic

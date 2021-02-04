@@ -27,6 +27,7 @@ pytest = "^6.2.2"
 pytest = "^6.1.2"
 pytest-console-scripts = "^1.1.0"
 astpretty = "^2.1.0"
+coverage = "^5.4"
 
 
 [build-system]

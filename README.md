@@ -4,8 +4,13 @@ Scargo is Argo for Scientific Workflows.
 
 ## Table of content
 
-- [Project description](#description)
+- [Description](#description)
+- [Features](#features)
+- [Core](#core)
+- [Support](#support)
+- [Non-goals](#non-goals)
 - [Installation](#installation)
+- [Testing](#testing)
 
 ## Description
 
@@ -53,7 +58,19 @@ Complete implementation of the Argo API, including:
 We rely on [`invoke`](http://www.pyinvoke.org/) to install our project code with Poetry.
 
 You can install the `scargo` project in development mode by running:
-
 ```bash
-$ inv install
+inv install
 ```
+
+## Testing
+
+Running the full test suite is as easy as running:
+```bash
+inv test
+```
+
+If you're interested in the code coverage of this repo you may run:
+```bash
+inv test --coverage --html-report
+```
+and inspect the resulting interactive HTML report by opening the `index.html` in the `htmlcov/` folder in your favourite browser.
