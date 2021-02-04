@@ -16,7 +16,7 @@ def env_local_mountpoint() -> Path:
     local_mountpoint = os.getenv("SCARGO_LOCAL_MOUNT")
 
     if local_mountpoint is None:
-        raise ValueError("SCARGO_LOCAL_MOUNT unset. ")
+        raise ValueError("Environment variable SCARGO_LOCAL_MOUNT not defined.")
 
     local_mountpoint = Path(local_mountpoint)
     if not local_mountpoint.is_dir():
