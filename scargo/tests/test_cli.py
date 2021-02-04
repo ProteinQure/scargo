@@ -18,6 +18,7 @@ def test_scargo_transpile(script_runner, scargo_workflow_params_file, check_tran
 
     check_transpiled_params_file(scargo_workflow_params_file)
 
+
 @pytest.mark.script_launch_mode("subprocess")
 def test_scargo_submit(script_runner):
     """

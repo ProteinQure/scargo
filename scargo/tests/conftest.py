@@ -40,14 +40,21 @@ def scargo_workflow_params_file():
         tmp.seek(0)  # go to beginning of file
         yield tmp.name
 
+
 @pytest.fixture
 def check_transpiled_params_file():
     """
-
+    Returns a commonly used function that checks if the transpilation of the
+    workflow parameters resulted in a YAML file with correct content. This
+    fixture should always (and only) be used together with the
+    `scargo_workflow_params_file` fixture.
     """
 
     def closure(path_to_scargo_params_file):
         """
+        Verify if the Python script in `path_to_scargo_params_file` was
+        successfully transpiled to an Argo YAML parameter file by checking for
+        its existence and double checking its content.
         """
 
         # ensure that the transpilation resulted in a YAML file in the same directory as the Python script
