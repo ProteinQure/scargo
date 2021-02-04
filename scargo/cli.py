@@ -28,7 +28,7 @@ def transpile(python_script: str):
     file and a parameter YAML file in the user's current working directory.
     """
     typer.echo(f"This subcommand should transpile {python_script} to Argo YAML.")
-    ast = transpiler.transpile(Path.cwd() / python_script)
+    transpiler.transpile(Path.cwd() / python_script)
 
 
 @app.command()
