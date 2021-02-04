@@ -1,6 +1,6 @@
 from collections import UserDict
 from pathlib import Path
-from typing import NamedTuple, Mapping
+from typing import Mapping, NamedTuple
 
 
 class MountPoint(NamedTuple):
@@ -11,7 +11,9 @@ class MountPoint(NamedTuple):
 
 class WorkflowParams(UserDict):
     def __init__(self, __dict: Mapping[str, str]) -> None:
-        super().__init__(__dict=__dict)
+        super().__init__()
+        for key, value in __dict.items():
+            super().__setitem__(key, value)
 
     def __setitem__(self, key: str, item: str) -> None:
         raise AttributeError("WorkflowParams is immutable.")
@@ -22,7 +24,9 @@ class WorkflowParams(UserDict):
 
 class MountPoints(UserDict):
     def __init__(self, __dict: Mapping[str, MountPoint]) -> None:
-        super().__init__(__dict=__dict)
+        super().__init__()
+        for key, value in __dict.items():
+            super().__setitem__(key, value)
 
     def __setitem__(self, key: str, item: str) -> None:
         raise AttributeError("MountPoints is immutable.")

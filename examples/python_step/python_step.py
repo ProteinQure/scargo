@@ -1,4 +1,4 @@
-from pathlib import Path
+from scargo.paths import env_local_mountpoint
 
 from scargo.decorators import scargo, entrypoint
 from scargo.args import FileOutput, ScargoInput, ScargoOutput
@@ -10,7 +10,7 @@ def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends to the character "a" to the "value" in `scargo_in`.
     """
-    result = str(scargo_in.parameters["value"]) + "a"
+    result = str(scargo_in.parameters["init-value"]) + "a"
 
     with scargo_out.artifacts["txt-out"].open(f"add_alpha_{scargo_in.parameters['init-value']}.txt") as fi:
         fi.write(result)
@@ -23,7 +23,7 @@ def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None
     """
 
     add_alpha(
-        ScargoInput(parameters={"value": workflow_parameters["input_val"]}),
+        ScargoInput(parameters={"init-value": workflow_parameters["input-val"]}),
         ScargoOutput(
             artifacts={
                 "txt-out": FileOutput(
@@ -45,7 +45,7 @@ workflow_parameters = WorkflowParams(
 mount_points = MountPoints(
     {
         "root": MountPoint(
-            local=Path("~/s3-data/scargo-examples"),
+            local=env_local_mountpoint(),
             remote=f"s3://{workflow_parameters['s3-bucket']}",
         )
     }
