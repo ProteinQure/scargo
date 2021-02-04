@@ -4,7 +4,7 @@ Core functionality of the Python -> Argo YAML transpiler.
 
 import ast
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 import yaml
 
 import astpretty
@@ -18,38 +18,33 @@ class ParameterTranspiler(ast.NodeVisitor):
     script.
     """
 
-    def __init__(self, path_to_script: Path):
-        """
-        Initializes the transpiler by extracting the AST from the scargo script.
-        """
-        self.path_to_script = path_to_script
-        self.script_name = path_to_script.stem
-        with open(path_to_script, "r") as source:
-            self.tree = ast.parse(source.read())
-
     def _check_for_workflow_params(self):
         """
         Check if this class has a 'ast_workflow_params' attribute which should
         be present after traversing the AST if the scargo script defines a
         WorkflowParams object.
         """
+
         if not getattr(self, "ast_workflow_params", False):
             raise ScargoTranspilerError("Please define WorkflowParams in your scargo script.")
 
-    def transpile(self):
+    def transpile(self, path_to_script: Path):
         """
-        Traverse the tree, find the instantiation of WorkflowParams() to
+        Convert the script to AST, traverse the tree, find the instantiation of WorkflowParams() to
         postprocess & return the workflow parameters as a Python dictionary.
         """
 
+        with open(path_to_script, "r") as source:
+            tree = ast.parse(source.read())
+
         # recursively traverse the tree to find the definition of the WorkflowParams object
-        self.visit(self.tree)
+        self.visit(tree)
         self._check_for_workflow_params()
 
         # postprocess the workflow parameters by converting them back to a Python dictionary
         param_keys = [k.value for k in self.ast_workflow_params[0].keys]
         param_values = [v.value for v in self.ast_workflow_params[0].values]
-        self.write_to_yaml(dict(zip(param_keys, param_values)))
+        self._write_to_yaml(path_to_script, dict(zip(param_keys, param_values)))
 
     def visit_Call(self, node: ast.Call):
         """
@@ -64,17 +59,19 @@ class ParameterTranspiler(ast.NodeVisitor):
             print(f"WorkflowParams are instantiated on line {node.lineno}")
             self.ast_workflow_params = node.args
 
-    def write_to_yaml(self, parameters: Dict):
+    @staticmethod
+    def _write_to_yaml(path_to_script: Path, parameters: Dict):
         """
         Writes the `parameters` to a YAML file in the same directory as the
         original Python input script.
         """
-        filename = f"{self.script_name.replace('_', '-')}-parameters.yaml"
-        with open(self.path_to_script.parent / filename, "w+") as yaml_out:
+
+        filename = f"{path_to_script.stem.replace('_', '-')}-parameters.yaml"
+        with open(path_to_script.parent / filename, "w+") as yaml_out:
             yaml.dump(parameters, yaml_out)
 
 
-def transpile(path_to_script: str):
+def transpile(path_to_script: Union[str, Path]):
     """
     Converts the `source` (usually a Python script) to a Python Abstract Syntax
     Tree (AST).
@@ -84,7 +81,7 @@ def transpile(path_to_script: str):
     path_to_script = Path(path_to_script)
 
     # transpile the workflow parameters from Python to YAML
-    ParameterTranspiler(path_to_script).transpile()
+    ParameterTranspiler().transpile(path_to_script)
 
     with open(path_to_script, "r") as source:
         tree = ast.parse(source.read())

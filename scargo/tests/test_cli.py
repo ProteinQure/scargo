@@ -7,15 +7,16 @@ import pytest
 
 
 @pytest.mark.script_launch_mode("subprocess")
-def test_scargo_transpile(script_runner):
+def test_scargo_transpile(script_runner, scargo_workflow_params_file, check_transpiled_params_file):
     """
     Test the `transpile` subcommand of the `scargo` CLI.
     """
 
-    result = script_runner.run("scargo", "transpile", "test_files/scargo_script.py")
+    result = script_runner.run("scargo", "transpile", scargo_workflow_params_file)
     assert result.success
     assert result.stderr == ""
 
+    check_transpiled_params_file(scargo_workflow_params_file)
 
 @pytest.mark.script_launch_mode("subprocess")
 def test_scargo_submit(script_runner):

@@ -20,6 +20,7 @@ url = "https://pypi.proteinqure.com/simple"
 python = "^3.8"
 typer = "^0.3.2"
 pyyaml = "^5.4.1"
+pytest = "^6.2.2"
 
 
 [tool.poetry.dev-dependencies]
