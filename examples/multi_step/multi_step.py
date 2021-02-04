@@ -3,6 +3,7 @@ from pathlib import Path
 from scargo.decorators import scargo, entrypoint
 from scargo.args import FileOutput, ScargoInput, ScargoOutput
 from scargo.core import WorkflowParams, MountPoint, MountPoints
+from scargo.paths import env_local_mountpoint
 
 
 @scargo(image="proteinqure/scargo")
@@ -30,9 +31,9 @@ def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None
     """
 
     alpha_out = ScargoOutput(parameters={"out-value": None})
-    add_alpha(ScargoInput(parameters={"init-value": workflow_parameters["input_val"]}), alpha_out)
+    add_alpha(ScargoInput(parameters={"init-value": workflow_parameters["input-val"]}), alpha_out)
     add_beta(
-        ScargoInput(parameters={"value": alpha_out.parameters["out-value"]}),
+        ScargoInput(parameters={"init-value": alpha_out.parameters["out-value"]}),
         ScargoOutput(
             artifacts={
                 "txt-out": FileOutput(
@@ -54,7 +55,7 @@ workflow_parameters = WorkflowParams(
 mount_points = MountPoints(
     {
         "root": MountPoint(
-            local=Path("~/s3-data/scargo-examples"),
+            local=env_local_mountpoint(),
             remote=f"s3://{workflow_parameters['s3-bucket']}",
         )
     }
