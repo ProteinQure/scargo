@@ -8,6 +8,7 @@ from scargo.decorators import entrypoint
 from scargo.functions import run_bash_step
 from scargo.args import FileInput, FileOutput, ScargoInput, ScargoOutput
 from scargo.core import WorkflowParams, MountPoint, MountPoints
+from scargo.paths import env_local_mountpoint
 
 
 @entrypoint
@@ -44,7 +45,7 @@ workflow_parameters = WorkflowParams(
 mount_points = MountPoints(
     {
         "root": MountPoint(
-            local=Path("~/s3-data/scargo-examples"),
+            local=env_local_mountpoint(),
             remote=f"s3://{workflow_parameters['s3-bucket']}",
         )
     }

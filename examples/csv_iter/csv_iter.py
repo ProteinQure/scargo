@@ -8,6 +8,7 @@ from scargo.decorators import scargo, entrypoint
 from scargo.functions import iter_csv
 from scargo.args import FileOutput, ScargoInput, ScargoOutput
 from scargo.core import WorkflowParams, MountPoint, MountPoints
+from scargo.paths import env_local_mountpoint
 
 
 @scargo(image="proteinqure/scargo")
@@ -49,7 +50,7 @@ workflow_parameters = WorkflowParams(
 mount_points = MountPoints(
     {
         "root": MountPoint(
-            local=Path("~/s3-data/scargo-examples"),
+            local=env_local_mountpoint(),
             remote=f"s3://{workflow_parameters['input-s3-bucket']}",
         )
     }
