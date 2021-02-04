@@ -26,7 +26,11 @@ def scargo(image):
 
 
 def entrypoint(func):
-    def decorator():
-        return func()
+    """
+    This decorator doesn't do anything, but is used to mark the entrypoint for the scargo transpiler.
+    """
+
+    def decorator(mount_points, workflow_parameters):
+        return func(mount_points, workflow_parameters)
 
     return decorator
