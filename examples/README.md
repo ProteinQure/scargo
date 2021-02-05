@@ -6,7 +6,7 @@ This folder contains examples of Scargo workflows. This document, which assumes 
 
 Let's start by looking at `python_step/`, since it's the simplest example.
 
-- The workflow can be run locally with `env SCARGO_LOCAL_MOUNT=(pwd) python python_step.py`
+- The workflow can be run locally with `env SCARGO_LOCAL_MOUNT=$(pwd) python python_step.py`
 - The transpiled result can be run with `argo submit python_step.yaml -f params.yaml`
 
 # Structure of examples
