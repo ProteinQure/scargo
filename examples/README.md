@@ -44,7 +44,7 @@ Argo-level flow control is written inside this `@entrypoint`. Specifically,
 
 ## Run @scargo functions
 
-A function marked by `@scargo` are run as normal Python function, both locally and in the Argo workflow. For a function to be transpilable, it can only use the parameters:
+A function marked by `@scargo` are run as normal Python function, both locally and in the Argo workflow. For a function to be transpilable, it can only take the arguments:
 
 1. `ScargoInput`
 2. `ScargoOutput`
