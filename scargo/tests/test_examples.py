@@ -13,7 +13,11 @@ from scargo.paths import EXAMPLES_DIR, PKG_ROOT_DIR
     ],
 )
 def test_run_examples(script_runner, script_path):
+    """
+    Test scargo Python examples.
 
+    Does not (yet) check expected outputs. Only checks runs complete without errors.
+    """
     result = script_runner.run("python", script_path, env={"SCARGO_LOCAL_MOUNT": PKG_ROOT_DIR})
     assert result.success
     assert result.stderr == ""
