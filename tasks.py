@@ -1,6 +1,7 @@
 """
 Definition of all invoke CLI commands for this project.
 """
+
 from invoke import task
 
 
@@ -30,13 +31,17 @@ def check(c):
 @task
 def test(c, coverage=False, html_report=False, keyword=None):
     """
-    Run tests using pytest. The `-k` flag works exactly like with pytest - it
-    will subselect tests according to the provided substring. If you want to
-    measure code coverage you just need to provide the `--coverage` flag. On
-    top of that, you can get a detailed interactive test coverage report by
-    providing the `--html-report` flag. To view the code coverage report,
-    navigate to the htmlcov/ directory, open the index.html in your favourite
-    browser and view the interactive coverage report.
+    Run tests using pytest.
+
+    Parameters
+    ----------
+    coverage : bool
+        Enable printing out test coverage of code.
+    html_report : bool
+        Generate detailed interactive test coverage report. To view the report, navigate to the htmlcov/ directory, open
+        the index.html in a browser and view the interactive coverage report.
+    keyword : str, optional
+        Subselects tests given the provided substring/keyword. Works exactly like the `pytest` `-k` flag.
 
     Example usage:
         inv test
@@ -49,7 +54,7 @@ def test(c, coverage=False, html_report=False, keyword=None):
         keyword_filter = ""
     else:
         keyword_filter = f"-k {keyword}"
-    test_command = f"pytest -vvv {keyword_filter} ."
+    test_command = f"pytest -vvv {keyword_filter} . --color=yes"
 
     if coverage:
         test_command = f"coverage run -m {test_command}"
