@@ -26,7 +26,7 @@ class ParameterTranspiler(ast.NodeVisitor):
         """
 
         if not getattr(self, "ast_workflow_params", False):
-            raise ScargoTranspilerError("Please define WorkflowParams in your scargo script.")
+            raise ScargoTranspilerError("Please create a global WorkflowParams instance in your scargo script.")
 
     def transpile(self, path_to_script: Path) -> None:
         """
