@@ -1,6 +1,8 @@
+import sys
+
 import pytest
 
-from scargo.paths import EXAMPLES_DIR, PKG_ROOT_DIR
+from scargo.paths import EXAMPLES_DIR
 
 
 @pytest.mark.script_launch_mode("subprocess")
@@ -18,6 +20,7 @@ def test_run_examples(script_runner, script_path):
 
     Does not (yet) check expected outputs. Only checks runs complete without errors.
     """
-    result = script_runner.run("python", script_path, env={"SCARGO_LOCAL_MOUNT": PKG_ROOT_DIR})
+    # using sys.executable instead of `python` because of virtualenvs
+    result = script_runner.run(sys.executable, script_path, env={"SCARGO_LOCAL_MOUNT": EXAMPLES_DIR / "data"})
     assert result.success
     assert result.stderr == ""
