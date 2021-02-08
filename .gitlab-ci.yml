@@ -30,6 +30,7 @@ black:
   script:
     - black --version
     - black --line-length 120 --check scargo/
+    - black --line-length 120 --check examples/
   allow_failure: true
 
 lint:
@@ -40,7 +41,9 @@ lint:
   image: $CI_RUNNER_IMAGE
   script:
     - flake8 scargo/
+    - flake8 examples/
     - pylint scargo/ --rcfile=setup.cfg --output-format=colorized
+    - pylint examples/ --rcfile=setup.cfg --output-format=colorized
   allow_failure: true
 
 test:

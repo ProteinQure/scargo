@@ -21,11 +21,15 @@ def check(c):
     """
     Runs all static checks, such as black, flake8 and pylint.
     """
+
     print("Black")
     c.run(f"black --line-length 120 {project_name}/")
+    c.run(f"black --line-length 120 examples/")
     print("Style checks")
     c.run(f"flake8 {project_name}/")
+    c.run(f"flake8 examples/")
     c.run(f"pylint {project_name}/ --rcfile=setup.cfg --output-format=colorized")
+    c.run(f"pylint examples/ --rcfile=setup.cfg --output-format=colorized")
 
 
 @task
