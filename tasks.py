@@ -17,14 +17,18 @@ def install(c):
 
 
 @task
-def check(c):
+def check(c, fix=True):
     """
     Runs all static checks, such as black, flake8 and pylint.
     """
 
+    check_command = ""
+    if not fix:
+        check_command = " --check "
+
     print("Black")
-    c.run(f"black --line-length 120 {project_name}/")
-    c.run(f"black --line-length 120 examples/")
+    c.run(f"black {check_command} --line-length 120 {project_name}/")
+    c.run(f"black {check_command} --line-length 120 examples/")
     print("Style checks")
     c.run(f"flake8 {project_name}/")
     c.run(f"flake8 examples/")

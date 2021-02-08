@@ -21,29 +21,12 @@ variables:
 
 ### JOBS ###
 
-black:
-  tags:
-    - cloud
+static-analysis:
   stage: static-analysis
   rules: *build-rules
   image: $CI_RUNNER_IMAGE
   script:
-    - black --version
-    - black --line-length 120 --check scargo/
-    - black --line-length 120 --check examples/
-  allow_failure: true
-
-lint:
-  tags:
-    - cloud
-  stage: static-analysis
-  rules: *build-rules
-  image: $CI_RUNNER_IMAGE
-  script:
-    - flake8 scargo/
-    - flake8 examples/
-    - pylint scargo/ --rcfile=setup.cfg --output-format=colorized
-    - pylint examples/ --rcfile=setup.cfg --output-format=colorized
+    - inv check --no-fix
   allow_failure: true
 
 test:
