@@ -20,7 +20,7 @@ def get_nth_word(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 
     scargo_out.parameters["out-val"] = word
 
-    with scargo_out.artifacts["out-file"].open("out-file.txt") as fi:
+    with scargo_out.artifacts["out-file"].open() as fi:
         fi.write(f"{scargo_in.parameters['pre-word']},{word},{scargo_in.parameters['post-word']}")
 
 
@@ -29,7 +29,7 @@ def add_multi_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends to the character "a" to the "value" in `scargo_in`.
     """
-    result = str(scargo_in.parameters["value"]) + "a"
+    result = str(scargo_in.parameters["init-value"]) + "a"
     with scargo_out.artifacts["txt-out"].open(f"add_multi_{scargo_in.parameters['init-value']}.txt") as fi:
         fi.write(result)
 
@@ -38,11 +38,19 @@ def add_multi_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
     nth_word_out = ScargoOutput(
         parameters={"out-value": None},
-        artifacts={"out-file": FileOutput(root=mount_points["root"], path=workflow_parameters["output-path"], name="out-file.txt")},
+        artifacts={
+            "out-file": FileOutput(
+                root=mount_points["root"], path=workflow_parameters["output-path"], name="out-file.txt"
+            )
+        },
     )
     get_nth_word(
         ScargoInput(
-            parameters={"word-index": workflow_parameters},
+            parameters={
+                "word-index": workflow_parameters["word-index"],
+                "pre-word": workflow_parameters["pre-word"],
+                "post-word": workflow_parameters["post-word"],
+            },
             artifacts={
                 "csv-file": FileInput(
                     root=mount_points["root"],
@@ -75,7 +83,7 @@ def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None
 
 workflow_parameters = WorkflowParams(
     {
-        "input-val": "1",
+        "word-index": "1",
         "pre-word": "pre",
         "post-word": "post",
         "num-alphas": "3",

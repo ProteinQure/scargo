@@ -30,7 +30,7 @@ class FileOutput(NamedTuple):
     path: str
     name: Optional[str] = None
 
-    def open(self, file_name: Optional[str]) -> TextIOWrapper:
+    def open(self, file_name: Optional[str] = None) -> TextIOWrapper:
         """
         Opens file for writing.
 

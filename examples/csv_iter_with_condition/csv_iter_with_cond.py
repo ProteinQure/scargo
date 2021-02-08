@@ -35,7 +35,7 @@ def add_two(scargo_input: ScargoInput, scargo_output: ScargoOutput) -> None:
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
     for csv_line in iter_csv(
-        mount_points["root"], Path(workflow_parameters["inputs-path"], workflow_parameters["input-csv"])
+        mount_points["root"], Path(workflow_parameters["input-path"], workflow_parameters["input-csv"])
     ):
         command_type = csv_line["command_type"]
         command_arg = csv_line["command_arg"]

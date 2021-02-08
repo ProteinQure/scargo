@@ -12,6 +12,9 @@ from scargo.paths import EXAMPLES_DIR
         EXAMPLES_DIR / "python_step" / "python_step.py",
         EXAMPLES_DIR / "multi_step" / "multi_step.py",
         EXAMPLES_DIR / "multi_step_with_condition" / "multi_step_with_cond.py",
+        EXAMPLES_DIR / "full_artifacts" / "full_artifacts.py",
+        EXAMPLES_DIR / "csv_iter" / "csv_iter.py",
+        EXAMPLES_DIR / "csv_iter_with_condition" / "csv_iter_with_cond.py",
     ],
 )
 def test_run_examples(script_runner, script_path):
