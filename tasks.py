@@ -14,12 +14,15 @@ def install(c):
     Install all requirements and setup poetry environment.
     """
     c.run("poetry install")
+    c.run("poetry run pre-commit install")
 
 
 @task
 def check(c, fix=True):
     """
-    Runs all static checks, such as black, flake8 and pylint.
+    Runs all static checks; black and pylint. If 'fix == False', black will
+    only check the files and not modify them. Use '--no-fix' to disable
+    auto-fixing.
     """
 
     check_command = ""
@@ -30,8 +33,6 @@ def check(c, fix=True):
     c.run(f"black {check_command} --line-length 120 {project_name}/")
     c.run(f"black {check_command} --line-length 120 examples/")
     print("Style checks")
-    c.run(f"flake8 {project_name}/")
-    c.run(f"flake8 examples/")
     c.run(f"pylint {project_name}/ --rcfile=setup.cfg --output-format=colorized")
     c.run(f"pylint examples/ --rcfile=setup.cfg --output-format=colorized")
 
