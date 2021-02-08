@@ -73,8 +73,8 @@ class ParameterTranspiler(ast.NodeVisitor):
 
 def transpile(path_to_script: Union[str, Path]) -> None:
     """
-    Converts the `source` (usually a Python script) to a Python Abstract Syntax
-    Tree (AST).
+    Transpiles the `source` (a Python script using the scargo library) to Argo
+    YAML via conversion to the Python Abstract Syntax Tree (AST).
     """
 
     # make sure that the Path is a pathlib object
