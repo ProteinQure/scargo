@@ -18,7 +18,7 @@ class ParameterTranspiler(ast.NodeVisitor):
     script.
     """
 
-    def _check_for_workflow_params(self):
+    def _check_for_workflow_params(self) -> None:
         """
         Check if this class has a 'ast_workflow_params' attribute which should
         be present after traversing the AST if the scargo script defines a
@@ -28,7 +28,7 @@ class ParameterTranspiler(ast.NodeVisitor):
         if not getattr(self, "ast_workflow_params", False):
             raise ScargoTranspilerError("Please define WorkflowParams in your scargo script.")
 
-    def transpile(self, path_to_script: Path):
+    def transpile(self, path_to_script: Path) -> None:
         """
         Convert the script to AST, traverse the tree, find the instantiation of WorkflowParams() to
         postprocess & return the workflow parameters as a Python dictionary.
@@ -46,7 +46,7 @@ class ParameterTranspiler(ast.NodeVisitor):
         param_values = [v.value for v in self.ast_workflow_params[0].values]
         self._write_to_yaml(path_to_script, dict(zip(param_keys, param_values)))
 
-    def visit_Call(self, node: ast.Call):
+    def visit_Call(self, node: ast.Call) -> None:
         """
         Visits every Call `node` in the tree and tries to find where in the
         script the user defined the WorkflowParams. Returning the `node.args`
@@ -60,7 +60,7 @@ class ParameterTranspiler(ast.NodeVisitor):
             self.ast_workflow_params = node.args
 
     @staticmethod
-    def _write_to_yaml(path_to_script: Path, parameters: Dict):
+    def _write_to_yaml(path_to_script: Path, parameters: Dict) -> None:
         """
         Writes the `parameters` to a YAML file in the same directory as the
         original Python input script.
@@ -71,7 +71,7 @@ class ParameterTranspiler(ast.NodeVisitor):
             yaml.dump(parameters, yaml_out)
 
 
-def transpile(path_to_script: Union[str, Path]):
+def transpile(path_to_script: Union[str, Path]) -> None:
     """
     Converts the `source` (usually a Python script) to a Python Abstract Syntax
     Tree (AST).
