@@ -100,7 +100,13 @@ class ScargoTranspiler(ast.NodeVisitor):
         workflow_params = ParameterTranspiler().transpile(path_to_script)
         self.transpiled_workflow["arguments"] = {"parameters": [{"name": name} for name in workflow_params.keys()]}
 
-        # TODO: add entrypoint
+        # parse the AST tree
+        with open(path_to_script, "r") as source:
+            tree = ast.parse(source.read())
+        self.visit(tree)  # traverse the tree
+
+        # add entrypoint
+        self.transpiled_workflow["entrypoint"] = self.entrypoint
 
         # TODO add step templates
 
@@ -108,6 +114,16 @@ class ScargoTranspiler(ast.NodeVisitor):
 
         # write the workflow to YAML
         self._write_to_yaml(path_to_script, self.transpiled_workflow)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        """
+        Visits all FunctionDef nodes and retrieves:
+            - the name of the function with the @entrypoint decorator
+        """
+
+        if isinstance(node.decorator_list[0], ast.Name):
+            if node.decorator_list[0].id == "entrypoint":
+                self.entrypoint = node.name
 
     @staticmethod
     def _write_to_yaml(path_to_script: Path, transpiled_workflow: Dict) -> None:
