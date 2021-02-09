@@ -60,6 +60,53 @@ class ParameterTranspiler(ast.NodeVisitor):
             yaml.dump(parameters, yaml_out)
 
 
+class ScriptTranspiler(ast.NodeVisitor):
+    """
+    Extracts and transpiles the scargo Python script to an Argo YAML workflow
+    file.
+    """
+
+    def __init__(self):
+        """
+        Configures the Argo headers.
+        """
+
+        # initialize the transpiled workflow dictionary
+        # with the typical Argo header
+        self.transpiled_workflow = {
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "Workflow",
+            "metadata": {"generateName": None},  # will be defined in self.transpile()
+            "spec": {
+                "volumes": {"name": "workdir", "emptyDir": {}},
+            },
+        }
+
+    def transpile(self, path_to_script: Path) -> None:
+        """
+        Convert the script to AST, traverse the tree and transpile the Python
+        statements to an Argo workflow.
+        """
+
+        # set the Argo workflow name based on the script name
+        hyphenated_script_name = path_to_script.stem.replace("_", "-")
+        self.transpiled_workflow["metadata"]["generateName"] = f"scargo-{hyphenated_script_name}-"
+
+        # write the workflow to YAML
+        self._write_to_yaml(path_to_script, self.transpiled_workflow)
+
+    @staticmethod
+    def _write_to_yaml(path_to_script: Path, transpiled_workflow: Dict) -> None:
+        """
+        Writes the `transpiled_workflow` to a YAML file in the same directory as the
+        original Python input script.
+        """
+
+        filename = f"{path_to_script.stem.replace('_', '-')}.yaml"
+        with open(path_to_script.parent / filename, "w+") as yaml_out:
+            yaml.dump(transpiled_workflow, yaml_out)
+
+
 def transpile(path_to_script: Union[str, Path]) -> None:
     """
     Transpiles the `source` (a Python script using the scargo library) to Argo
