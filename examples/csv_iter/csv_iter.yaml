@@ -10,16 +10,10 @@ spec:
   arguments:
     parameters:
       - name: s3-bucket
-        value: pq-dataxfer-tmp
       - name: input-path
-        value: scargo/inputs
       - name: output-path
-        value: scargo/outputs
       - name: input-csv
-        value: input_csv.csv
       - name: optimized
-        # valid values are `cpu`, `memory`
-        value: cpu
 
   entrypoint: main
 

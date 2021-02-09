@@ -10,14 +10,9 @@ spec:
   arguments:
     parameters:
       - name: input-val
-        value: "1"
       - name: s3-bucket
-        value: pq-dataxfer-tmp
       - name: output-path
-        value: testing/scargo-examples/output
       - name: optimized
-        # valid values are `cpu`, `memory`
-        value: cpu
 
   entrypoint: main
 

@@ -10,21 +10,12 @@ spec:
   arguments:
     parameters:
       - name: project
-        value: "{{workflow.namespace}}"
       - name: input-s3-bucket
-        value: "pq-proj-{{workflow.parameters.project}}"
       - name: input-s3-path
-        value: scargo/inputs
       - name: input-csv
-        value: input_csv.csv
-        # By default we'll write to the same S3 bucket and path, but this may be overridden
       - name: output-s3-bucket
-        value: "{{workflow.parameters.input-s3-bucket}}"
       - name: output-s3-path
-        value: "{{workflow.parameters.input-s3-path}}/scargo/outputs"
       - name: optimized
-        # valid values are `cpu`, `memory`
-        value: cpu
 
   entrypoint: main
 

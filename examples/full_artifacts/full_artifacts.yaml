@@ -10,24 +10,14 @@ spec:
   arguments:
     parameters:
       - name: input-val
-        value: "1"
       - name: pre-word
-        value: "pre"
       - name: post-word
-        value: "post"
       - name: num-alphas
-        value: "3"
       - name: s3-bucket
-        value: pq-dataxfer-tmp
       - name: input-path
-        value: scargo/inputs
       - name: input-csv
-        value: input_csv.csv
       - name: output-path
-        value: testing/scargo-examples/output
       - name: optimized
-        # valid values are `cpu`, `memory`
-        value: cpu
 
   entrypoint: main
 
