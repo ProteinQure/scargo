@@ -20,8 +20,9 @@ class ParameterTranspiler(ast.NodeVisitor):
 
     def transpile(self, path_to_script: Path) -> None:
         """
-        Convert the script to AST, traverse the tree, find the instantiation of WorkflowParams() to
-        postprocess & return the workflow parameters as a Python dictionary.
+        Convert the script to AST, traverse the tree, find the instantiation of
+        WorkflowParams() to postprocess, write them to a Argo parameter YAML
+        file & return the workflow parameters as a Python dictionary.
         """
 
         with open(path_to_script, "r") as source:
@@ -48,6 +49,8 @@ class ParameterTranspiler(ast.NodeVisitor):
         # postprocess the workflow parameters by converting them back to a Python dictionary
         self._write_to_yaml(path_to_script, workflow_params)
 
+        return workflow_params
+
     @staticmethod
     def _write_to_yaml(path_to_script: Path, parameters: Dict) -> None:
         """
@@ -60,7 +63,7 @@ class ParameterTranspiler(ast.NodeVisitor):
             yaml.dump(parameters, yaml_out)
 
 
-class ScriptTranspiler(ast.NodeVisitor):
+class ScargoTranspiler(ast.NodeVisitor):
     """
     Extracts and transpiles the scargo Python script to an Argo YAML workflow
     file.
@@ -92,6 +95,17 @@ class ScriptTranspiler(ast.NodeVisitor):
         hyphenated_script_name = path_to_script.stem.replace("_", "-")
         self.transpiled_workflow["metadata"]["generateName"] = f"scargo-{hyphenated_script_name}-"
 
+        # transpile the parameters and write them to a separate YAML
+        # as well as include their names in the main YAML workflow file
+        workflow_params = ParameterTranspiler().transpile(path_to_script)
+        self.transpiled_workflow["arguments"] = {"parameters": [{"name": name} for name in workflow_params.keys()]}
+
+        # TODO: add entrypoint
+
+        # TODO add step templates
+
+        # TODO: add templates
+
         # write the workflow to YAML
         self._write_to_yaml(path_to_script, self.transpiled_workflow)
 
@@ -104,7 +118,7 @@ class ScriptTranspiler(ast.NodeVisitor):
 
         filename = f"{path_to_script.stem.replace('_', '-')}.yaml"
         with open(path_to_script.parent / filename, "w+") as yaml_out:
-            yaml.dump(transpiled_workflow, yaml_out)
+            yaml.dump(transpiled_workflow, yaml_out, sort_keys=False)
 
 
 def transpile(path_to_script: Union[str, Path]) -> None:
@@ -117,7 +131,7 @@ def transpile(path_to_script: Union[str, Path]) -> None:
     path_to_script = Path(path_to_script)
 
     # transpile the workflow parameters from Python to YAML
-    ParameterTranspiler().transpile(path_to_script)
+    ScargoTranspiler().transpile(path_to_script)
 
     with open(path_to_script, "r") as source:
         tree = ast.parse(source.read())
