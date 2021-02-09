@@ -30,11 +30,11 @@ def check(c, fix=True):
         check_command = " --check "
 
     print("Black")
-    c.run(f"black {check_command} --line-length 120 {project_name}/")
-    c.run(f"black {check_command} --line-length 120 examples/")
+    c.run(f"black {check_command} {project_name}/")
+    c.run(f"black {check_command} examples/")
     print("Style checks")
-    c.run(f"pylint {project_name}/ --rcfile=setup.cfg --output-format=colorized")
-    c.run(f"pylint examples/ --rcfile=setup.cfg --output-format=colorized")
+    c.run(f"pylint {project_name}/ --output-format=colorized")
+    c.run(f"pylint examples/ --output-format=colorized")
 
 
 @task
