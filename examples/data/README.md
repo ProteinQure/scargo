@@ -1,6 +1,6 @@
 This folder contains data used for running the examples. When running examples which require input files, such as `csv_iter`, `SCARGO_LOCAL_MOUNT` must point to this folder.
 
-This folder's directory structure mirrors the remote S3 folder structure for convenience [1].
+This folder's directory structure mirrors the remote S3 folder structure in the bucket `s3://pq-dataxfer-tmp` for convenience [1].
 
 ## Running remote examples
 
@@ -8,7 +8,7 @@ Verify the data exists remotely by running `aws s3 ls s3://pq-dataxfer-tmp/testi
 
 If it does not exist, upload it with `aws s3 sync testing/scargo-examples/ s3://pq-dataxfer-tmp/testing/scargo-examples/`.
 
-If running the examples remotely, the outputs can be downloaded by running BLAH.
+If running the examples remotely, the outputs can be downloaded by running `aws s3 sync s3://pq-dataxfer-tmp/testing/scargo-examples/output/ testing/scargo-examples/output`.
 
 When not running examples, it is recommended you create your own folder `~/s3-data` and manage your workflow inputs/outputs from there.
 
