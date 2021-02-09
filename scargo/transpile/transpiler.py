@@ -10,6 +10,7 @@ import yaml
 import astpretty
 
 from scargo.errors import ScargoTranspilerError
+from scargo.transpile.utils import hyphenate
 
 
 class ParameterTranspiler(ast.NodeVisitor):
@@ -109,8 +110,31 @@ class ScargoTranspiler(ast.NodeVisitor):
         self.transpiled_workflow["entrypoint"] = self.entrypoint
 
         # TODO add step templates
+        templates = []
+        entrypoint_template = {
+            "name": self.entrypoint,
+            "steps": [
+                {
+                    "name": hyphenate(step["name"]),
+                    "template": f"{hyphenate(step['name'])}-template",
+                    "arguments": {
+                        "parameters": [
+                            {
+                                "name": "TODO",
+                                "value": "TODO",
+                            }
+                            for parameter in step["inputs"].keywords[0].value.keys
+                        ]
+                    },
+                }
+                for step in self.steps
+            ],
+        }
+        templates.append(entrypoint_template)
 
         # TODO: add templates
+
+        self.transpiled_workflow["templates"] = templates
 
         # write the workflow to YAML
         self._write_to_yaml(path_to_script, self.transpiled_workflow)
@@ -124,6 +148,19 @@ class ScargoTranspiler(ast.NodeVisitor):
         if isinstance(node.decorator_list[0], ast.Name):
             if node.decorator_list[0].id == "entrypoint":
                 self.entrypoint = node.name
+
+                self.steps = []
+                for expression in node.body:
+                    if isinstance(expression.value, ast.Call):
+                        # TODO: maybe create simple Steps class that parses
+                        # this into an easily accessible object?
+                        self.steps.append(
+                            {
+                                "name": expression.value.func.id,
+                                "inputs": expression.value.args[0],
+                                "outputs": expression.value.args[1],
+                            }
+                        )
 
     @staticmethod
     def _write_to_yaml(path_to_script: Path, transpiled_workflow: Dict) -> None:
