@@ -42,6 +42,8 @@ class ParameterTranspiler(ast.NodeVisitor):
         self._check_for_workflow_params()
 
         # postprocess the workflow parameters by converting them back to a Python dictionary
+        if len(self.ast_workflow_params) != 1:
+            raise ScargoTranspilerError(f"WorkflowParams should only take one argument!")
         param_keys = [k.value for k in self.ast_workflow_params[0].keys]
         param_values = [v.value for v in self.ast_workflow_params[0].values]
         self._write_to_yaml(path_to_script, dict(zip(param_keys, param_values)))
