@@ -18,16 +18,6 @@ class ParameterTranspiler(ast.NodeVisitor):
     script.
     """
 
-    def _check_for_workflow_params(self) -> None:
-        """
-        Check if this class has a 'ast_workflow_params' attribute which should
-        be present after traversing the AST if the scargo script defines a
-        WorkflowParams object.
-        """
-
-        if not getattr(self, "ast_workflow_params", False):
-            raise ScargoTranspilerError("Please create a global WorkflowParams instance in your scargo script.")
-
     def transpile(self, path_to_script: Path) -> None:
         """
         Convert the script to AST, traverse the tree, find the instantiation of WorkflowParams() to
@@ -37,29 +27,26 @@ class ParameterTranspiler(ast.NodeVisitor):
         with open(path_to_script, "r") as source:
             tree = ast.parse(source.read())
 
-        # recursively traverse the tree to find the definition of the WorkflowParams object
-        self.visit(tree)
-        self._check_for_workflow_params()
+        # traverse only the top-level nodes to find the definition of the WorkflowParams object
+        occurences = 0
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.Assign) and node.value.func.id == "WorkflowParams":
+                workflow_params_args = node.value.args
+                if len(workflow_params_args) != 1:
+                    raise ScargoTranspilerError("WorkflowParams should only take one argument!")
+
+                occurences += 1
+                param_keys = [k.value for k in workflow_params_args[0].keys]
+                param_values = [v.value for v in workflow_params_args[0].values]
+                workflow_params = dict(zip(param_keys, param_values))
+
+        if occurences == 0:
+            raise ScargoTranspilerError("WorkflowParams object could not be found at the global level.")
+        elif occurences > 1:
+            raise ScargoTranspilerError("Multiple WorkflowParams objects found. Please only define one.")
 
         # postprocess the workflow parameters by converting them back to a Python dictionary
-        if len(self.ast_workflow_params) != 1:
-            raise ScargoTranspilerError(f"WorkflowParams should only take one argument!")
-        param_keys = [k.value for k in self.ast_workflow_params[0].keys]
-        param_values = [v.value for v in self.ast_workflow_params[0].values]
-        self._write_to_yaml(path_to_script, dict(zip(param_keys, param_values)))
-
-    def visit_Call(self, node: ast.Call) -> None:
-        """
-        Visits every Call `node` in the tree and tries to find where in the
-        script the user defined the WorkflowParams. Returning the `node.args`
-        doesn't makes sense since there might be other Call nodes left to visit
-        after this one. Therefore, we assign it to a class attribute that we
-        can postprocess later.
-        """
-
-        if type(node.func) == ast.Name and node.func.id == "WorkflowParams":
-            print(f"WorkflowParams are instantiated on line {node.lineno}")
-            self.ast_workflow_params = node.args
+        self._write_to_yaml(path_to_script, workflow_params)
 
     @staticmethod
     def _write_to_yaml(path_to_script: Path, parameters: Dict) -> None:
