@@ -11,8 +11,8 @@ def test_get_vars_single_line():
         (
             0,
             [
-                BashVar(io="inputs", io_type="artifacts", name="input-csv", location=slice(4, 34)),
-                BashVar(io="outputs", io_type="artifacts", name="output-csv", location=slice(55, 87)),
+                BashVar(var_type="inputs", io_type="artifacts", name="input-csv", location=slice(4, 34)),
+                BashVar(var_type="outputs", io_type="artifacts", name="output-csv", location=slice(55, 87)),
             ],
         )
     ]
@@ -22,24 +22,24 @@ def test_get_vars_single_line():
 
 def test_get_vars_multi_line():
     expected = [
-        (4, [BashVar(io="outputs", io_type="artifacts", name="extracted-pdb", location=slice(14, 49))]),
-        (7, [BashVar(io="inputs", io_type="artifacts", name="sequence-file", location=slice(8, 42))]),
-        (8, [BashVar(io="inputs", io_type="artifacts", name="pdb-file", location=slice(8, 37))]),
-        (17, [BashVar(io="inputs", io_type="artifacts", name="sequence-file", location=slice(30, 64))]),
-        (20, [BashVar(io="inputs", io_type="artifacts", name="pdb-file", location=slice(16, 45))]),
-        (22, [BashVar(io="inputs", io_type="parameters", name="nstruct", location=slice(13, 42))]),
-        (23, [BashVar(io="inputs", io_type="parameters", name="unique-id", location=slice(12, 43))]),
-        (25, [BashVar(io="outputs", io_type="artifacts", name="silent-file", location=slice(17, 50))]),
+        (4, [BashVar(var_type="outputs", io_type="artifacts", name="extracted-pdb", location=slice(14, 49))]),
+        (7, [BashVar(var_type="inputs", io_type="artifacts", name="sequence-file", location=slice(8, 42))]),
+        (8, [BashVar(var_type="inputs", io_type="artifacts", name="pdb-file", location=slice(8, 37))]),
+        (17, [BashVar(var_type="inputs", io_type="artifacts", name="sequence-file", location=slice(30, 64))]),
+        (20, [BashVar(var_type="inputs", io_type="artifacts", name="pdb-file", location=slice(16, 45))]),
+        (22, [BashVar(var_type="inputs", io_type="parameters", name="nstruct", location=slice(13, 42))]),
+        (23, [BashVar(var_type="inputs", io_type="parameters", name="unique-id", location=slice(12, 43))]),
+        (25, [BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(17, 50))]),
         (
             28,
             [
-                BashVar(io="outputs", io_type="artifacts", name="silent-file", location=slice(11, 44)),
-                BashVar(io="outputs", io_type="artifacts", name="score-file", location=slice(47, 79)),
+                BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(11, 44)),
+                BashVar(var_type="outputs", io_type="artifacts", name="score-file", location=slice(47, 79)),
             ],
         ),
-        (31, [BashVar(io="outputs", io_type="artifacts", name="extracted-pdb", location=slice(3, 38))]),
-        (33, [BashVar(io="outputs", io_type="artifacts", name="silent-file", location=slice(16, 49))]),
-        (34, [BashVar(io="inputs", io_type="parameters", name="pdb-file-name", location=slice(12, 47))]),
+        (31, [BashVar(var_type="outputs", io_type="artifacts", name="extracted-pdb", location=slice(3, 38))]),
+        (33, [BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(16, 49))]),
+        (34, [BashVar(var_type="inputs", io_type="parameters", name="pdb-file-name", location=slice(12, 47))]),
     ]
     lines = [
         "#!/bin/bash\n",
@@ -183,8 +183,8 @@ def test_replace_vars():
     result = replace_vars(
         "cat {{inputs.artifacts.input-csv}} | cut -d ',' -f 1 > {{outputs.artifacts.txt-out}}",
         [
-            BashVar(io="inputs", io_type="artifacts", name="input-csv", location=slice(4, 34)),
-            BashVar(io="outputs", io_type="artifacts", name="txt-out", location=slice(53, 87)),
+            BashVar(var_type="inputs", io_type="artifacts", name="input-csv", location=slice(4, 34)),
+            BashVar(var_type="outputs", io_type="artifacts", name="txt-out", location=slice(53, 87)),
         ],
         ScargoInput(
             artifacts={

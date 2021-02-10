@@ -1,5 +1,5 @@
 import re
-from typing import List, Match, NamedTuple, Tuple
+from typing import List, Literal, Match, NamedTuple, Tuple
 
 from scargo.args import ScargoInput, ScargoOutput
 
@@ -7,18 +7,25 @@ from scargo.args import ScargoInput, ScargoOutput
 VAR_REGEX = re.compile(r"(?<=\{\{)[^{}]+(?=\}\})")
 VAR_NAME_RE = re.compile(r"^[\w\-]+")
 
+VarType = Literal["inputs", "outputs"]
+IOType = Literal["parameters", "artifacts"]
+
 
 class BashVar(NamedTuple):
-    io: str  # TODO: should be enumerated type
-    io_type: str
+    var_type: VarType
+    io_type: IOType
     name: str
     location: slice
 
 
 LineMatches = List[Tuple[int, List[Match[str]]]]
+LineBashVars = List[Tuple[int, List[BashVar]]]
 
 
 def valid_name(name: str) -> bool:
+    """
+    Check if string is valid name for an Argo variable.
+    """
     found_pattern = VAR_NAME_RE.match(name)
     if found_pattern is None:
         return False
@@ -41,7 +48,7 @@ def extract_vars_from_str(tmpl_lines: List[str]) -> Tuple[LineMatches, int]:
     return all_vars, total_vars
 
 
-def get_bash_vars(all_vars: LineMatches) -> List[Tuple[int, List[BashVar]]]:
+def get_bash_vars(all_vars: LineMatches) -> LineBashVars:
     """
     Convert bash template variable matches in each line to Scargo-compatible variables.
     """
@@ -49,6 +56,7 @@ def get_bash_vars(all_vars: LineMatches) -> List[Tuple[int, List[BashVar]]]:
     invalid_vars = []
     for l_i, line_vars in all_vars:
         bash_vars = []
+
         for line_var in line_vars:
             var_str = line_var.group(0).strip()
             var_parts = var_str.split(".")
@@ -60,33 +68,36 @@ def get_bash_vars(all_vars: LineMatches) -> List[Tuple[int, List[BashVar]]]:
                         f"Expected something like inputs.artifacts.name, but found '{var_str}'."
                     )
                 )
-            elif var_parts[0] != "inputs" and var_parts[0] != "outputs":
-                invalid_vars.append(
-                    (
-                        f"Line {l_i+1}: Invalid variable type. "
-                        f"Expected 'inputs' or 'outputs', but found '{var_parts[0]}' in '{var_str}'."
-                    )
-                )
-            elif var_parts[1] != "parameters" and var_parts[1] != "artifacts":
-                invalid_vars.append(
-                    (
-                        f"Line {l_i+1}: Invalid IO type."
-                        f"Expected 'parameters' or 'artifacts', but found '{var_parts[2]}' in '{var_str}'."
-                    )
-                )
-            elif not valid_name(var_parts[2]):
-                invalid_vars.append(
-                    (
-                        f"Line {l_i+1}: Invalid variable name of '{var_parts[2]}'."
-                        "Names can only contain dashes, underscores and alpha-numeric characters."
-                    )
-                )
             else:
-                # increase span by 2 in both directions to get curly braces
-                span = (line_var.span()[0] - 2, line_var.span()[1] + 2)
-                bash_vars.append(
-                    BashVar(io=var_parts[0], io_type=var_parts[1], name=var_parts[2], location=slice(*span))
-                )
+                var_type = var_parts[0]
+                io_type = var_parts[1]
+                name = var_parts[2]
+
+                if var_type != "inputs" and var_type != "outputs":
+                    invalid_vars.append(
+                        (
+                            f"Line {l_i+1}: Invalid variable type. "
+                            f"Expected 'inputs' or 'outputs', but found '{var_type}' in '{var_str}'."
+                        )
+                    )
+                elif io_type != "parameters" and io_type != "artifacts":
+                    invalid_vars.append(
+                        (
+                            f"Line {l_i+1}: Invalid IO type."
+                            f"Expected 'parameters' or 'artifacts', but found '{name}' in '{var_str}'."
+                        )
+                    )
+                elif not valid_name(name):
+                    invalid_vars.append(
+                        (
+                            f"Line {l_i+1}: Invalid variable name of '{name}'."
+                            "Names can only contain dashes, underscores and alpha-numeric characters."
+                        )
+                    )
+                else:
+                    # increase span by 2 in both directions to get curly braces
+                    span = (line_var.span()[0] - 2, line_var.span()[1] + 2)
+                    bash_vars.append(BashVar(var_type=var_type, io_type=io_type, name=name, location=slice(*span)))
 
         all_bash_vars.append((l_i, bash_vars))
 
@@ -97,7 +108,7 @@ def get_bash_vars(all_vars: LineMatches) -> List[Tuple[int, List[BashVar]]]:
     return all_bash_vars
 
 
-def get_vars(tmpl_lines: List[str]) -> List[Tuple[int, List[BashVar]]]:
+def get_vars(tmpl_lines: List[str]) -> LineBashVars:
     """
     Extract all Scargo-compatible template variables from a Bash template.
     """
@@ -109,14 +120,16 @@ def get_vars(tmpl_lines: List[str]) -> List[Tuple[int, List[BashVar]]]:
         return get_bash_vars(all_vars)
 
 
-def get_missing_vars(all_vars, scargo_in: ScargoInput, scargo_out: ScargoOutput) -> List[Tuple[int, BashVar]]:
+def get_missing_vars(
+    all_vars: LineBashVars, scargo_in: ScargoInput, scargo_out: ScargoOutput
+) -> List[Tuple[int, BashVar]]:
     """
     Return missing variable with line number for the purposes of reporting legible errors to the user.
     """
     missing_vars = []
     for l_i, line_vars in all_vars:
         for line_var in line_vars:
-            if line_var.io == "outputs":
+            if line_var.var_type == "outputs":
                 insert_var = scargo_out
             else:
                 insert_var = scargo_in
@@ -145,7 +158,7 @@ def replace_vars(
     for var in replace_vars:
         new_str.append(orig_str[last_stop : var.location.start])
 
-        if var.io == "outputs":
+        if var.var_type == "outputs":
             insert_var = scargo_out
         else:
             insert_var = scargo_in
