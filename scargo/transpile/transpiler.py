@@ -11,7 +11,7 @@ import astpretty
 
 from scargo.core import WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.utils import hyphenate
+from scargo.transpile.utils import hyphenate, Transput
 
 
 class ScargoTranspiler(ast.NodeVisitor):
@@ -70,8 +70,7 @@ class ScargoTranspiler(ast.NodeVisitor):
         Convert the script to AST, traverse the tree and transpile the Python
         statements to an Argo workflow.
         """
-
-        script_locals = self._get_script_locals(path_to_script)
+        self.script_locals = self._get_script_locals(path_to_script)
         workflow_params = self.transpile_parameters(path_to_script)
 
         # set the Argo workflow name based on the script name
@@ -84,8 +83,8 @@ class ScargoTranspiler(ast.NodeVisitor):
 
         # parse the AST tree
         with open(path_to_script, "r") as source:
-            tree = ast.parse(source.read())
-        self.visit(tree)  # traverse the tree
+            self.tree = ast.parse(source.read())
+        self.visit(self.tree)  # traverse the tree
 
         # add entrypoint
         self.transpiled_workflow["entrypoint"] = self.entrypoint
@@ -96,15 +95,15 @@ class ScargoTranspiler(ast.NodeVisitor):
             "name": self.entrypoint,
             "steps": [
                 {
-                    "name": hyphenate(step["name"]),
-                    "template": f"{hyphenate(step['name'])}-template",
+                    "name": hyphenate(step.name),
+                    "template": f"{hyphenate(step.name)}-template",
                     "arguments": {
                         "parameters": [
                             {
-                                "name": "TODO",
-                                "value": "TODO",
+                                "name": name,
+                                "value": value,
                             }
-                            for parameter in step["inputs"].keywords[0].value.keys
+                            for name, value in step.inputs.parameters.items()
                         ]
                     },
                 }
@@ -134,12 +133,9 @@ class ScargoTranspiler(ast.NodeVisitor):
                         # TODO: maybe create simple Steps class that parses
                         # this into an easily accessible object?
                         self.steps.append(
-                            {
-                                "name": expression.value.func.id,
-                                "inputs": expression.value.args[0],
-                                "outputs": expression.value.args[1],
-                            }
+                            WorkflowStep(call_node=expression.value, locals_context=self.script_locals, tree=self.tree)
                         )
+                        pass
 
     @staticmethod
     def _write_workflow_to_yaml(path_to_script: Path, transpiled_workflow: Dict) -> None:
@@ -162,6 +158,105 @@ class ScargoTranspiler(ast.NodeVisitor):
         filename = f"{path_to_script.stem.replace('_', '-')}-parameters.yaml"
         with open(path_to_script.parent / filename, "w+") as yaml_out:
             yaml.dump(dict(parameters), yaml_out)
+
+
+class WorkflowStep:
+    """
+    A single step/template in the workflow.
+    """
+
+    def __init__(self, call_node: ast.Call, locals_context: Dict, tree: ast.Module) -> None:
+        """
+        Create a new WorkflowStep.
+
+        Parameters
+        ----------
+        call_node : ast.Call
+            The Call node that invokes this workflow step. In other words the
+            Call node which calls the @scargo decorated function in the
+            @entrypoint function.
+        locals_context : Dict
+            The locals() context resulting from `exec`uting the Python scargo
+            script. Should contain all the global imports, variables and
+            function definitions.
+        tree : ast.Module
+            The entire (!) Abstract Syntax Tree of the Python scargo script.
+        """
+        self.call_node = call_node
+        self.locals_context = locals_context
+        self.tree = tree
+
+    @property
+    def name(self) -> str:
+        """
+        Returns the name of the workflow step.
+        """
+        return self.call_node.func.id
+
+    @staticmethod
+    def _get_variable_from_args_or_kwargs(
+        node: ast.Call, variable_name: str, arg_index: int
+    ) -> Union[ast.keyword, ast.Dict]:
+        """
+        We don't know if the user has passed a positional or a keyworded
+        argument to `node` which result in different ASTs. Since this is a
+        common occurence, this method figures it out for you and returns the
+        node representing the variable.
+        """
+        if node.args:
+            variable_node = node.args[arg_index]
+        elif node.keywords:
+            variable_node = list(filter(lambda k: k.arg == variable_name, node.keywords))[0].value
+        else:
+            raise ScargoTranspilerError(f"Can't parse {variable_name} from {node.func.id}.")
+
+        return variable_node
+
+    def _resolve_parameter_value(self, raw_value: ast.Subscript) -> str:
+        """
+        Given a Subscript node (`raw_value`) this method uses the
+        locals_context of the scargo script and the AST to resolve this node
+        either into the actual parameter value or into a reference to the
+        global Argo workflow parameters.
+        """
+
+        if isinstance(raw_value, ast.Subscript):
+            # could be a list, tuple or dict
+            subscripted_object = raw_value.value.id
+            if subscripted_object in self.locals_context:
+                if isinstance(self.locals_context[subscripted_object], WorkflowParams):
+                    value = "{{" + f"workflow.parameters.{raw_value.slice.value.value}" + "}}"
+
+        return value
+
+    @property
+    def inputs(self) -> Transput:
+        """
+        Parses the input parameters and artifacts from the workflow step and
+        returns them as a Transput object (which has a `parameters` and an
+        `artifacts` attribute for easy access.
+        """
+        scargo_inputs = self._get_variable_from_args_or_kwargs(self.call_node, "scargo_in", 0)
+        if scargo_inputs.func.id != "ScargoInput":
+            raise ScargoTranspilerError("First argument to a @scargo function must be a `ScargoInput`.")
+
+        raw_parameters = self._get_variable_from_args_or_kwargs(scargo_inputs, "parameters", 0)
+        parameters = {}
+        for key, value in zip(raw_parameters.keys, raw_parameters.values):
+            parameters[key.value] = self._resolve_parameter_value(value)
+
+        # TODO: need to process input artifacts
+
+        return Transput(parameters=parameters)
+
+    @property
+    def outputs(self) -> Transput:
+        """
+        Parses the input parameters and artifacts from the workflow step and
+        returns them as a Transput object (which has a `parameters` and an
+        `artifacts` attribute for easy access.
+        """
+        return Transput()
 
 
 def transpile(path_to_script: Union[str, Path]) -> None:
