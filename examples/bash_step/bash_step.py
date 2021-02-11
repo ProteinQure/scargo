@@ -14,7 +14,7 @@ from scargo.paths import env_local_mountpoint
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
     run_bash_step(
-        bash_template=Path("append-sh.j2"),
+        bash_template=Path(__file__).parent / "append-sh.j2",
         scargo_input=ScargoInput(
             artifacts={
                 "input-csv": FileInput(
