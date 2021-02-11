@@ -12,6 +12,10 @@ IOType = Literal["parameters", "artifacts"]
 
 
 class BashVar(NamedTuple):
+    """
+    Variable extracted from bash template with associated information for replacement by ScargoInput or ScargoOutput
+    """
+
     var_type: VarType
     io_type: IOType
     name: str
@@ -125,6 +129,15 @@ def get_missing_vars(
 ) -> List[Tuple[int, BashVar]]:
     """
     Return missing variable with line number for the purposes of reporting legible errors to the user.
+
+    Parameters
+    ----------
+    all_vars : LineBashVars
+        All variables extracted from a bash template
+    scargo_in : ScargoInput
+        Input Parameters and Artifacts to be inserted into the template
+    scargo_out : ScargoOutput
+        Output Parameters and Artifacts to be inserted into the template
     """
     missing_vars = []
     for l_i, line_vars in all_vars:
@@ -173,7 +186,16 @@ def replace_vars(
 
 def fill_template(tmpl_lines: List[str], scargo_in: ScargoInput, scargo_out: ScargoOutput) -> List[str]:
     """
-    Extract and fill all Scargo-compatible variables in a bash template
+    Extract and fill all Scargo-compatible variables in a bash template.
+
+    Parameters
+    ----------
+    tmpl_lines : List[str]
+        All lines of a given bash template
+    scargo_in : ScargoInput
+        Input Parameters and Artifacts to be inserted into the template
+    scargo_out : ScargoOutput
+        Output Parameters and Artifacts to be inserted into the template
     """
     all_vars = get_vars(tmpl_lines)
     missing = get_missing_vars(all_vars, scargo_in, scargo_out)
