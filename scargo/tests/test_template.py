@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scargo.args import FileInput, FileOutput, ScargoInput, ScargoOutput, MountPoint
-from scargo.template import BashVar, extract_vars_from_str, get_bash_vars, get_vars, replace_vars
+from scargo.template import BashVar, extract_vars_from_str, get_bash_vars, get_missing_vars, get_vars, replace_vars
 
 
 def test_get_vars_single_line():
@@ -173,6 +173,47 @@ def test_get_bash_vars_multi_invalid(bad_str):
         get_bash_vars(all_vars)
 
     assert "Invalid variable name" in str(err.value)
+
+
+def test_missing_vars():
+    mount_point = MountPoint(
+        local=Path("~/s3-data"),
+        remote="s3://pq-dataxfer-tmp",
+    )
+    result = get_missing_vars(
+        [
+            # Should be determined to be missing due to no io_type="artifacts" given in ScargoInput
+            (0, [BashVar(var_type="inputs", io_type="parameters", name="input-val", location=slice(4, 34))]),
+            (
+                1,
+                [
+                    # Should be determined to be missing due to no variable named "output-txt"
+                    BashVar(var_type="outputs", io_type="artifacts", name="output-txt", location=slice(20, 30)),
+                    # Should be found
+                    BashVar(var_type="outputs", io_type="artifacts", name="txt-out", location=slice(53, 87)),
+                ],
+            ),
+        ],
+        ScargoInput(
+            artifacts={
+                "input-csv": FileInput(
+                    root=mount_point,
+                    path="testing/scargo-examples",
+                    name="input.csv",
+                )
+            }
+        ),
+        ScargoOutput(
+            artifacts={
+                "txt-out": FileOutput(root=mount_point, path="testing/scargo-examples/output", name="output.txt")
+            }
+        ),
+    )
+
+    assert result == [
+        (0, BashVar(var_type="inputs", io_type="parameters", name="input-val", location=slice(4, 34))),
+        (1, BashVar(var_type="outputs", io_type="artifacts", name="output-txt", location=slice(20, 30))),
+    ]
 
 
 def test_replace_vars():

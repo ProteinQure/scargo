@@ -147,13 +147,12 @@ def get_missing_vars(
             else:
                 insert_var = scargo_in
 
-            try:
-                io_type = getattr(insert_var, line_var.io_type)
-            except AttributeError:
+            insert_vars_names = getattr(insert_var, line_var.io_type)
+            if insert_vars_names is None:
                 missing_vars.append((l_i, line_var))
-                io_type = None
+                insert_vars_names = None
 
-            if io_type is not None and line_var.name not in io_type:
+            elif line_var.name not in insert_vars_names:
                 missing_vars.append((l_i, line_var))
 
     return missing_vars
@@ -198,9 +197,12 @@ def fill_template(tmpl_lines: List[str], scargo_in: ScargoInput, scargo_out: Sca
         Output Parameters and Artifacts to be inserted into the template
     """
     all_vars = get_vars(tmpl_lines)
-    missing = get_missing_vars(all_vars, scargo_in, scargo_out)
-    if len(missing) > 0:
-        raise ValueError("Missing variables")
+    missing_vars = get_missing_vars(all_vars, scargo_in, scargo_out)
+    if len(missing_vars) > 0:
+        err_str = f"{len(missing_vars)} template variables were not provided:\n" + "\n".join(
+            [f"  Line {l_i}, {line_var.location.start}: {line_var.name}" for l_i, line_var in missing_vars]
+        )
+        raise ValueError(err_str)
 
     for l_i, line_vars in all_vars:
         tmpl_lines[l_i] = "".join(replace_vars(tmpl_lines[l_i], line_vars, scargo_in, scargo_out))
