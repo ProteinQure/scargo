@@ -34,6 +34,7 @@ def run_bash_step(bash_template: Path, scargo_input: ScargoInput, scargo_output:
         Scargo Output Artifacts and Parameters used to fill `bash_template`
     """
     with bash_template.open("r") as fi:
-        filled = fill_template(fi.readlines(), scargo_input, scargo_output)
+        filled_template = fill_template(fi.readlines(), scargo_input, scargo_output)
 
-    subprocess.run("".join(filled), check=True)
+    # use `bash -c`, since escaping and passing the command otherwise is too difficult
+    subprocess.run(["bash", "-c", "".join(filled_template)], check=True)
