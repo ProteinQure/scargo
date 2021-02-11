@@ -220,12 +220,18 @@ class WorkflowStep:
         global Argo workflow parameters.
         """
 
+        value = None
         if isinstance(raw_value, ast.Subscript):
             # could be a list, tuple or dict
             subscripted_object = raw_value.value.id
             if subscripted_object in self.locals_context:
                 if isinstance(self.locals_context[subscripted_object], WorkflowParams):
                     value = "{{" + f"workflow.parameters.{raw_value.slice.value.value}" + "}}"
+        elif isinstance(raw_value, ast.Constant):
+            value = raw_value.value
+
+        if value is None:
+            raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(raw_value)}")
 
         return value
 
