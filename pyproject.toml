@@ -15,11 +15,11 @@ url = "https://pypi.proteinqure.com/simple"
 python = "^3.8"
 typer = "^0.3.2"
 pyyaml = "^5.4.1"
-pytest = "^6.2.2"
+astor = "^0.8.1"
 
 
 [tool.poetry.dev-dependencies]
-pytest = "^6.1.2"
+pytest = "^6.2.2"
 pytest-console-scripts = "^1.1.0"
 astpretty = "^2.1.0"
 coverage = "^5.4"
