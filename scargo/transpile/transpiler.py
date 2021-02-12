@@ -89,14 +89,14 @@ class ScargoTranspiler(ast.NodeVisitor):
         # add entrypoint
         self.transpiled_workflow["entrypoint"] = self.entrypoint
 
-        # TODO add step templates
+        # add entrypoint template
         templates = []
         entrypoint_template = {
             "name": self.entrypoint,
             "steps": [
                 {
-                    "name": hyphenate(step.name),
-                    "template": f"{hyphenate(step.name)}-template",
+                    "name": step.hyphenated_name,
+                    "template": step.template_name,
                     "arguments": {
                         "parameters": [
                             {
@@ -112,15 +112,20 @@ class ScargoTranspiler(ast.NodeVisitor):
         }
         templates.append(entrypoint_template)
 
-        # TODO: add templates
-        self.transpiled_workflow["templates"] = templates
+        # add templates for the individual workflow steps
+        for step in self.steps:
+            templates.append(step.template)
 
+        # update the transpiled workflow and write to YAML
+        self.transpiled_workflow["templates"] = templates
         self._write_workflow_to_yaml(path_to_script, self.transpiled_workflow)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """
         Visits all FunctionDef nodes and retrieves:
             - the name of the function with the @entrypoint decorator
+            - a list of all workflow steps (one for every expression in the
+              @entrypoint-decorated function)
         """
 
         if isinstance(node.decorator_list[0], ast.Name):
@@ -190,6 +195,31 @@ class WorkflowStep:
         Returns the name of the workflow step.
         """
         return self.call_node.func.id
+
+    @property
+    def hyphenated_name(self) -> str:
+        """
+        Returns the name of the workflow step.
+        """
+        return hyphenate(self.name)
+
+    @property
+    def template_name(self) -> str:
+        """
+        Returns the template name of the workflow step.
+        """
+        return f"{self.hyphenated_name}-template"
+
+    @property
+    def image(self) -> str:
+        """
+        Returns the Docker image that this workflow step is supposed to be
+        executed in.
+        """
+        for toplevel_node in ast.iter_child_nodes(self.tree):
+            if isinstance(toplevel_node, ast.FunctionDef) and toplevel_node.name == self.name:
+                scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", toplevel_node.decorator_list))[0]
+                return self._get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
 
     @staticmethod
     def _get_variable_from_args_or_kwargs(
@@ -377,6 +407,58 @@ class WorkflowStep:
                 artifacts[key.value] = self._transpile_artifact(raw_artifact, output=True)
 
         return Transput(parameters=parameters, artifacts=artifacts)
+
+    @property
+    def template(self) -> Dict:
+        """
+        Returns the dictionary defining the Argo template for this workflow
+        step.
+        """
+
+        template = {"name": self.template_name}
+
+        if self.inputs.exist:
+            inputs_section = {"inputs": dict()}
+            if self.inputs.parameters:
+                inputs_section["inputs"]["parameters"] = [{"name": key} for key in self.inputs.parameters]
+            if self.inputs.artifacts:
+                inputs_section["inputs"]["artifacts"] = [
+                    dict({"name": key}, **value) for key, value in self.inputs.artifacts.items()
+                ]
+            template.update(inputs_section)
+
+        if self.outputs.exist:
+            outputs_section = {"outputs": dict()}
+            if self.outputs.parameters:
+                outputs_section["outputs"]["parameters"] = [{"name": key} for key in self.outputs.parameters]
+            if self.outputs.artifacts:
+                outputs_section["outputs"]["artifacts"] = [
+                    dict({"name": key}, **value) for key, value in self.outputs.artifacts.items()
+                ]
+            template.update(outputs_section)
+
+        template.update(
+            {
+                "script": {
+                    "image": self.image,
+                    "command": "[python]",  # TODO: needs to be dynamic
+                    "source": "blah",  # TODO: needs to be dynamic
+                    "resources": {
+                        "requests": {
+                            "memory": "30Mi",
+                            "cpu": "20m",
+                        },
+                        "limits": {
+                            "memory": "30Mi",
+                            "cpu": "20m",
+                        },
+                    },
+                    "volumeMounts": [{"name": "workdir", "mountPath": "/workdir"}],  # TODO: only include if needed
+                },
+            }
+        )
+
+        return template
 
 
 def transpile(path_to_script: Union[str, Path]) -> None:
