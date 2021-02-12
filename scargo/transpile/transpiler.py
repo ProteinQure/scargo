@@ -203,37 +203,112 @@ class WorkflowStep:
         common occurence, this method figures it out for you and returns the
         node representing the variable.
         """
-        if node.args:
-            variable_node = node.args[arg_index]
+        if node.args and len(node.args) > arg_index:
+            return node.args[arg_index]
         elif node.keywords:
-            variable_node = list(filter(lambda k: k.arg == variable_name, node.keywords))[0].value
+            filtered_keywords = list(filter(lambda k: k.arg == variable_name, node.keywords))
+            if filtered_keywords:
+                return filtered_keywords[0].value
         else:
             raise ScargoTranspilerError(f"Can't parse {variable_name} from {node.func.id}.")
 
-        return variable_node
-
-    def _resolve_parameter_value(self, raw_value: ast.Subscript) -> str:
+    def _resolve_workflow_param(self, raw_parameter: Union[ast.Constant, ast.Subscript]) -> str:
         """
-        Given a Subscript node (`raw_value`) this method uses the
-        locals_context of the scargo script and the AST to resolve this node
+        Given a Subscript or Constant node (`raw_parameter`) this method uses the
+        locals_context of the scargo script and the AST to transpile this node
         either into the actual parameter value or into a reference to the
         global Argo workflow parameters.
         """
 
         value = None
-        if isinstance(raw_value, ast.Subscript):
+        if isinstance(raw_parameter, ast.Subscript):
             # could be a list, tuple or dict
-            subscripted_object = raw_value.value.id
+            subscripted_object = raw_parameter.value.id
             if subscripted_object in self.locals_context:
                 if isinstance(self.locals_context[subscripted_object], WorkflowParams):
-                    value = "{{" + f"workflow.parameters.{raw_value.slice.value.value}" + "}}"
-        elif isinstance(raw_value, ast.Constant):
-            value = raw_value.value
+                    value = "{{" + f"workflow.parameters.{raw_parameter.slice.value.value}" + "}}"
 
         if value is None:
-            raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(raw_value)}")
+            raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(raw_parameter)}")
 
         return value
+
+    def _is_workflow_param(self, object_name: str) -> bool:
+        """
+        Checks if the `object_name` is a global workflow parameter.
+        """
+        if object_name in self.locals_context:
+            if isinstance(self.locals_context[object_name], WorkflowParams):
+                return True
+        return False
+
+    def _resolve_subscript(self, node: ast.Subscript):
+        """"""
+        subscripted_object_name = node.value.id
+        subscript = node.slice.value.value
+
+        if self._is_workflow_param(subscripted_object_name):
+            return self._resolve_workflow_param(node)
+
+        # use the AST to check if this was defined as a string
+        for toplevel_node in ast.iter_child_nodes(self.tree):
+            if isinstance(toplevel_node, ast.Assign):
+                relevant_target = list(filter(lambda t: t.id == subscripted_object_name, toplevel_node.targets))
+                if relevant_target and relevant_target[0].id == subscripted_object_name:
+
+                    subscripted_object = self._get_variable_from_args_or_kwargs(toplevel_node.value, "__dict", 0)
+                    resolved_node = list(
+                        filter(
+                            lambda tuple_: tuple_[0].value == subscript,
+                            zip(subscripted_object.keys, subscripted_object.values),
+                        )
+                    )[0][1]
+
+                    if isinstance(resolved_node, ast.Constant):
+                        return resolved_node.value
+                    elif isinstance(resolved_node, ast.Call):
+                        return self._resolve_workflow_param(
+                            self._get_variable_from_args_or_kwargs(resolved_node, "remote", 1)
+                        )
+                    else:
+                        raise ScargoTranspilerError(
+                            f"Cannot resolve {subscripted_object_name}[{subscript}] from {type(resolved_node)}"
+                        )
+
+        raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
+
+    def _transpile_artifact(self, raw_artifact: Union[ast.Constant, ast.Call], output: bool) -> str:
+        """
+        Given a Call and Constant node (`raw_artifact`) this method uses the
+        locals_context of the scargo script and the AST to transpile this node
+        either into the actual artifact value or into a reference to the global
+        Argo workflow parameters.
+        """
+
+        artifact = None
+        if isinstance(raw_artifact, ast.Call) and raw_artifact.func.id == "FileOutput":
+
+            root = self._resolve_subscript(self._get_variable_from_args_or_kwargs(raw_artifact, "root", 0))
+            path = self._resolve_subscript(self._get_variable_from_args_or_kwargs(raw_artifact, "path", 1))
+
+            artifact = {
+                "path": "/workdir/out" if output else "/workdir/in",
+                "archive": {
+                    "none": {},
+                },
+                "s3": {
+                    "endpoint": "s3.amazonaws.com",
+                    "bucket": root,
+                    "key": path,
+                },
+            }
+
+        if artifact is None:
+            raise ScargoTranspilerError(
+                f"Cannot resolve artifact {raw_artifact.func.id} from node type {type(raw_artifact)}"
+            )
+
+        return artifact
 
     @property
     def inputs(self) -> Transput:
@@ -248,12 +323,17 @@ class WorkflowStep:
 
         raw_parameters = self._get_variable_from_args_or_kwargs(scargo_inputs, "parameters", 0)
         parameters = {}
-        for key, value in zip(raw_parameters.keys, raw_parameters.values):
-            parameters[key.value] = self._resolve_parameter_value(value)
+        if raw_parameters:
+            for key, value in zip(raw_parameters.keys, raw_parameters.values):
+                parameters[key.value] = self._resolve_workflow_param(value)
 
-        # TODO: need to process input artifacts
+        raw_artifacts = self._get_variable_from_args_or_kwargs(scargo_inputs, "artifacts", 1)
+        artifacts = {}
+        if raw_artifacts:
+            for key, raw_artifact in zip(raw_artifacts.keys, raw_artifacts.values):
+                artifacts[key.value] = self._resolve_workflow_param(raw_artifact, output=False)
 
-        return Transput(parameters=parameters)
+        return Transput(parameters=parameters, artifacts=artifacts)
 
     @property
     def outputs(self) -> Transput:
@@ -262,7 +342,23 @@ class WorkflowStep:
         returns them as a Transput object (which has a `parameters` and an
         `artifacts` attribute for easy access.
         """
-        return Transput()
+        scargo_outputs = self._get_variable_from_args_or_kwargs(self.call_node, "scargo_out", 1)
+        if scargo_outputs.func.id != "ScargoOutput":
+            raise ScargoTranspilerError("Second argument to a @scargo function must be a `ScargoOutput`.")
+
+        raw_parameters = self._get_variable_from_args_or_kwargs(scargo_outputs, "parameters", 0)
+        parameters = {}
+        if raw_parameters:
+            for key, value in zip(raw_parameters.keys, raw_parameters.values):
+                parameters[key.value] = self._resolve_workflow_param(value)
+
+        raw_artifacts = self._get_variable_from_args_or_kwargs(scargo_outputs, "artifacts", 1)
+        artifacts = {}
+        if raw_artifacts:
+            for key, raw_artifact in zip(raw_artifacts.keys, raw_artifacts.values):
+                artifacts[key.value] = self._transpile_artifact(raw_artifact, output=True)
+
+        return Transput(parameters=parameters, artifacts=artifacts)
 
 
 def transpile(path_to_script: Union[str, Path]) -> None:
