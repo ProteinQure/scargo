@@ -9,7 +9,7 @@ import yaml
 
 import astpretty
 
-from scargo.core import WorkflowParams
+from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile.utils import hyphenate, Transput
 
@@ -130,8 +130,6 @@ class ScargoTranspiler(ast.NodeVisitor):
                 self.steps = []
                 for expression in node.body:
                     if isinstance(expression.value, ast.Call):
-                        # TODO: maybe create simple Steps class that parses
-                        # this into an easily accessible object?
                         self.steps.append(
                             WorkflowStep(call_node=expression.value, locals_context=self.script_locals, tree=self.tree)
                         )
@@ -212,7 +210,7 @@ class WorkflowStep:
         else:
             raise ScargoTranspilerError(f"Can't parse {variable_name} from {node.func.id}.")
 
-    def _resolve_workflow_param(self, raw_parameter: Union[ast.Constant, ast.Subscript]) -> str:
+    def _resolve_workflow_param(self, node: ast.Subscript) -> str:
         """
         Given a Subscript or Constant node (`raw_parameter`) this method uses the
         locals_context of the scargo script and the AST to transpile this node
@@ -221,34 +219,46 @@ class WorkflowStep:
         """
 
         value = None
-        if isinstance(raw_parameter, ast.Subscript):
+        if isinstance(node, ast.Subscript):
             # could be a list, tuple or dict
-            subscripted_object = raw_parameter.value.id
+            subscripted_object = node.value.id
             if subscripted_object in self.locals_context:
                 if isinstance(self.locals_context[subscripted_object], WorkflowParams):
-                    value = "{{" + f"workflow.parameters.{raw_parameter.slice.value.value}" + "}}"
+                    value = "{{" + f"workflow.parameters.{node.slice.value.value}" + "}}"
 
         if value is None:
-            raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(raw_parameter)}")
+            raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(node)}")
 
         return value
 
     def _is_workflow_param(self, object_name: str) -> bool:
         """
-        Checks if the `object_name` is a global workflow parameter.
+        Checks if the `object_name` is a global WorkflowParams object.
         """
         if object_name in self.locals_context:
             if isinstance(self.locals_context[object_name], WorkflowParams):
                 return True
         return False
 
-    def _resolve_subscript(self, node: ast.Subscript):
-        """"""
+    def _is_mount_points(self, object_name: str) -> bool:
+        """
+        Checks if the `object_name` is a global MountPoints object.
+        """
+        if object_name in self.locals_context:
+            if isinstance(self.locals_context[object_name], MountPoints):
+                return True
+        return False
+
+    def _resolve_mount_points(self, node: ast.Subscript) -> str:
+        """
+        Resolves a `node` if the object it refers to is a `MountPoints`
+        instance. This requires a few extra steps since `MountPoints` tend to
+        be nested objects containing one or several `MountPoint` (singular!)
+        objects which in turn can be made up of references to the global
+        workflow parameter object.
+        """
         subscripted_object_name = node.value.id
         subscript = node.slice.value.value
-
-        if self._is_workflow_param(subscripted_object_name):
-            return self._resolve_workflow_param(node)
 
         # use the AST to check if this was defined as a string
         for toplevel_node in ast.iter_child_nodes(self.tree):
@@ -264,18 +274,26 @@ class WorkflowStep:
                         )
                     )[0][1]
 
-                    if isinstance(resolved_node, ast.Constant):
-                        return resolved_node.value
-                    elif isinstance(resolved_node, ast.Call):
-                        return self._resolve_workflow_param(
-                            self._get_variable_from_args_or_kwargs(resolved_node, "remote", 1)
-                        )
-                    else:
-                        raise ScargoTranspilerError(
-                            f"Cannot resolve {subscripted_object_name}[{subscript}] from {type(resolved_node)}"
-                        )
+                    remote_subscript_object = self._get_variable_from_args_or_kwargs(resolved_node, "remote", 1)
+                    if self._is_workflow_param(remote_subscript_object.value.id):
+                        return self._resolve_workflow_param(remote_subscript_object)
 
-        raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
+        raise ScargoTranspilerError(f"Cannot resolve mount point {subscripted_object_name}[{subscript}]")
+
+    def _resolve_subscript(self, node: ast.Subscript):
+        """
+        General method that is used to resolve Subscript nodes which typically
+        tend to involve the global workflow parameters or mount points.
+        """
+        subscripted_object_name = node.value.id
+        subscript = node.slice.value.value
+
+        if self._is_workflow_param(subscripted_object_name):
+            return self._resolve_workflow_param(node)
+        elif self._is_mount_points(subscripted_object_name):
+            return self._resolve_mount_points(node)
+        else:
+            raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
 
     def _transpile_artifact(self, raw_artifact: Union[ast.Constant, ast.Call], output: bool) -> str:
         """
@@ -331,7 +349,7 @@ class WorkflowStep:
         artifacts = {}
         if raw_artifacts:
             for key, raw_artifact in zip(raw_artifacts.keys, raw_artifacts.values):
-                artifacts[key.value] = self._resolve_workflow_param(raw_artifact, output=False)
+                artifacts[key.value] = self._transpile_artifact(raw_artifact, output=False)
 
         return Transput(parameters=parameters, artifacts=artifacts)
 
