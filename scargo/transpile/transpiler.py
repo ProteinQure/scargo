@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Dict, Union
 import yaml
 
+import astor
 import astpretty
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.utils import hyphenate, Transput
+from scargo.transpile.utils import ArgoYamlDumper, hyphenate, Transput
 
 
 class ScargoTranspiler(ast.NodeVisitor):
@@ -147,9 +148,22 @@ class ScargoTranspiler(ast.NodeVisitor):
         original Python input script.
         """
 
+        def repr_str(dumper, data):
+            """
+            Custom string representation to ensure a leading "|" followed by a
+            line break in the source section of the Argo YAML workflow file.
+            """
+            if "\n" in data:
+                return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+            return dumper.org_represent_str(data)
+
+        # back up the default string representer and register the custom one
+        ArgoYamlDumper.org_represent_str = ArgoYamlDumper.represent_str
+        yaml.add_representer(str, repr_str, Dumper=ArgoYamlDumper)
+
         filename = f"{path_to_script.stem.replace('_', '-')}.yaml"
         with open(path_to_script.parent / filename, "w+") as yaml_out:
-            yaml.dump(transpiled_workflow, yaml_out, sort_keys=False)
+            yaml.dump(transpiled_workflow, yaml_out, Dumper=ArgoYamlDumper, sort_keys=False)
 
     @staticmethod
     def _write_params_to_yaml(path_to_script: Path, parameters: Dict) -> None:
@@ -216,10 +230,18 @@ class WorkflowStep:
         Returns the Docker image that this workflow step is supposed to be
         executed in.
         """
+        scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", self.functiondef_node.decorator_list))[0]
+        return self._get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
+
+    @property
+    def functiondef_node(self) -> ast.FunctionDef:
+        """
+        Returns the FunctionDef node which represents the definition of the
+        Python function corresponding to this workflow step.
+        """
         for toplevel_node in ast.iter_child_nodes(self.tree):
             if isinstance(toplevel_node, ast.FunctionDef) and toplevel_node.name == self.name:
-                scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", toplevel_node.decorator_list))[0]
-                return self._get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
+                return toplevel_node
 
     @staticmethod
     def _get_variable_from_args_or_kwargs(
@@ -359,6 +381,18 @@ class WorkflowStep:
         return artifact
 
     @property
+    def source_code(self):
+        """
+        Returns the source code for this workflow step.
+        """
+        source = ""
+        for node in self.functiondef_node.body:
+            if not isinstance(node, ast.Expr):  # if it's not a docstring
+                source += astor.to_source(node)
+
+        return source
+
+    @property
     def inputs(self) -> Transput:
         """
         Parses the input parameters and artifacts from the workflow step and
@@ -439,10 +473,24 @@ class WorkflowStep:
 
         template.update(
             {
+                "initContainers": [
+                    {
+                        "name": "mkdir",
+                        "image": "alpine:latest",
+                        "command": '["mkdir", "-p", "/workdir/out"]',
+                        "mirrorVolumeMounts": True,
+                    },
+                    {
+                        "name": "chmod",
+                        "image": "alpine:latest",
+                        "command": '["chmod", "-R", "a+rwX", "/workdir"]',
+                        "mirrorVolumeMounts": True,
+                    },
+                ],
                 "script": {
                     "image": self.image,
                     "command": "[python]",  # TODO: needs to be dynamic
-                    "source": "blah",  # TODO: needs to be dynamic
+                    "source": self.source_code,
                     "resources": {
                         "requests": {
                             "memory": "30Mi",
