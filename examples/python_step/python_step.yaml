@@ -53,9 +53,9 @@ spec:
         image: python:alpine
         command: [python]
         source: |
-          with open("{{outputs.artifacts.txt-out.path}}/python_step_add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
-              fi.write(str({{inputs.parameters.init-value}}) + "a")
-
+          result = str({{inputs.parameters.init-value}}) + "a"
+          with open("{{outputs.artifacts.txt-out.path}}/add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write(result)
         resources:
           requests:
             memory: 30Mi

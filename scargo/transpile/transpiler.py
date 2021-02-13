@@ -3,6 +3,7 @@ Core functionality of the Python -> Argo YAML transpiler.
 """
 
 import ast
+import copy
 from pathlib import Path
 from typing import Dict, Union
 import yaml
@@ -12,7 +13,7 @@ import astpretty
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.utils import ArgoYamlDumper, hyphenate, Transput
+from scargo.transpile.utils import ArgoYamlDumper, hyphenate, SourceToArgoTransformer, Transput
 
 
 class ScargoTranspiler(ast.NodeVisitor):
@@ -33,7 +34,7 @@ class ScargoTranspiler(ast.NodeVisitor):
             "kind": "Workflow",
             "metadata": {"generateName": None},  # will be defined in self.transpile()
             "spec": {
-                "volumes": {"name": "workdir", "emptyDir": {}},
+                "volumes": [{"name": "workdir", "emptyDir": {}}],
             },
         }
 
@@ -80,7 +81,7 @@ class ScargoTranspiler(ast.NodeVisitor):
 
         # transpile the parameters and write them to a separate YAML
         # as well as include their names in the main YAML workflow file
-        self.transpiled_workflow["arguments"] = {"parameters": [{"name": name} for name in workflow_params]}
+        self.transpiled_workflow["spec"]["arguments"] = {"parameters": [{"name": name} for name in workflow_params]}
 
         # parse the AST tree
         with open(path_to_script, "r") as source:
@@ -88,27 +89,29 @@ class ScargoTranspiler(ast.NodeVisitor):
         self.visit(self.tree)  # traverse the tree
 
         # add entrypoint
-        self.transpiled_workflow["entrypoint"] = self.entrypoint
+        self.transpiled_workflow["spec"]["entrypoint"] = self.entrypoint
 
         # add entrypoint template
         templates = []
         entrypoint_template = {
             "name": self.entrypoint,
             "steps": [
-                {
-                    "name": step.hyphenated_name,
-                    "template": step.template_name,
-                    "arguments": {
-                        "parameters": [
-                            {
-                                "name": name,
-                                "value": value,
-                            }
-                            for name, value in step.inputs.parameters.items()
-                        ]
-                    },
-                }
-                for step in self.steps
+                [
+                    {
+                        "name": step.hyphenated_name,
+                        "template": step.template_name,
+                        "arguments": {
+                            "parameters": [
+                                {
+                                    "name": name,
+                                    "value": value,
+                                }
+                                for name, value in step.inputs.parameters.items()
+                            ]
+                        },
+                    }
+                    for step in self.steps
+                ]
             ],
         }
         templates.append(entrypoint_template)
@@ -118,7 +121,7 @@ class ScargoTranspiler(ast.NodeVisitor):
             templates.append(step.template)
 
         # update the transpiled workflow and write to YAML
-        self.transpiled_workflow["templates"] = templates
+        self.transpiled_workflow["spec"]["templates"] = templates
         self._write_workflow_to_yaml(path_to_script, self.transpiled_workflow)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -127,6 +130,8 @@ class ScargoTranspiler(ast.NodeVisitor):
             - the name of the function with the @entrypoint decorator
             - a list of all workflow steps (one for every expression in the
               @entrypoint-decorated function)
+
+        TODO: only iterate over the top-level nodes
         """
 
         if isinstance(node.decorator_list[0], ast.Name):
@@ -385,8 +390,20 @@ class WorkflowStep:
         """
         Returns the source code for this workflow step.
         """
+
+        # get the names of the ScargoInput/ScargoOutput arguments
+        # in the docs, we demand the first argument to be ScargoInput and the
+        # second to be ScargoOutput
+        input_arg_name = self.functiondef_node.args.args[0].arg
+        output_arg_name = self.functiondef_node.args.args[1].arg
+
+        # write a general function that resolves f-strings with WorkflowParams/MountPoints
+        converted_functiondef = SourceToArgoTransformer(input_arg_name, output_arg_name).visit(
+            copy.deepcopy(self.functiondef_node)
+        )
+
         source = ""
-        for node in self.functiondef_node.body:
+        for node in converted_functiondef.body:
             if not isinstance(node, ast.Expr):  # if it's not a docstring
                 source += astor.to_source(node)
 
@@ -477,19 +494,19 @@ class WorkflowStep:
                     {
                         "name": "mkdir",
                         "image": "alpine:latest",
-                        "command": '["mkdir", "-p", "/workdir/out"]',
+                        "command": ["mkdir", "-p", "/workdir/out"],
                         "mirrorVolumeMounts": True,
                     },
                     {
                         "name": "chmod",
                         "image": "alpine:latest",
-                        "command": '["chmod", "-R", "a+rwX", "/workdir"]',
+                        "command": ["chmod", "-R", "a+rwX", "/workdir"],
                         "mirrorVolumeMounts": True,
                     },
                 ],
                 "script": {
                     "image": self.image,
-                    "command": "[python]",  # TODO: needs to be dynamic
+                    "command": ["python"],  # TODO: needs to be dynamic
                     "source": self.source_code,
                     "resources": {
                         "requests": {
