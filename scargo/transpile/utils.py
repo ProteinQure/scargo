@@ -110,19 +110,23 @@ class SourceToArgoTransformer(ast.NodeTransformer):
             return None
 
     @staticmethod
-    def _resolve_string(node: Union[ast.Constant, ast.JoinedStr]) -> str:
+    def _resolve_string(node: ast.JoinedStr) -> str:
         """
         Given a node that either represent a normal string or an f-string,
         resolve the content of that string from the node.
         """
-        string = ""
+        string_parts = []
         for value in node.values:
             if isinstance(value, ast.Constant):
-                string += value.value
+                string_parts.append(value.value)
             elif isinstance(value, ast.FormattedValue):
-                string += value.value.value
+                format_str_val = value.value
+                if isinstance(format_str_val, ast.Constant):
+                    string_parts.append(format_str_val.value)
+                else:
+                    raise NotImplementedError("Unimplemented f-string type.")
 
-        return string
+        return "".join(string_parts)
 
     def visit_Call(self, node: ast.Call) -> ast.Call:
         """
