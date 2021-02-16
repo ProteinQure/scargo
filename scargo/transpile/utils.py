@@ -183,10 +183,13 @@ class SourceToArgoTransformer(ast.NodeTransformer):
             path_prefix = node.func.value.value
 
             # get the second part of the path + filename
-            if isinstance(node.args[0], ast.Constant):
-                path = node.args[0].value
-            elif type(node.args[0]) in [ast.Constant, ast.JoinedStr]:
-                path = self._resolve_string(node.args[0])
+            raw_path = node.args[0]
+            if isinstance(raw_path, ast.Constant):
+                path = raw_path.value
+            elif isinstance(raw_path, ast.JoinedStr):
+                path = self._resolve_string(raw_path)
+            else:
+                raise NotImplementedError("Unknown path type.")
 
             return ast.Call(
                 func=ast.Name(id="open", ctx=ast.Load()),
