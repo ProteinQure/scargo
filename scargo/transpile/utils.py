@@ -196,6 +196,5 @@ class SourceToArgoTransformer(ast.NodeTransformer):
                 ],
                 keywords=[],
             )
-
-        # otherwise don't change anything
-        return node
+        else:
+            return node
