@@ -89,23 +89,42 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         Converts Subscript nodes operating on ScargoInput/ScargoOutput argument names into strings refering to the
         inputs/outputs parameters/artifacts.
         """
-        if self._resolve_subscript(node):
-            return ast.Constant(value=self._resolve_subscript(node), kind=None, ctx=node.ctx)
+        if self._resolve_subscript(node, self.input_argument, self.output_argument) is not None:
+            return ast.Constant(
+                value=self._resolve_subscript(node, self.input_argument, self.output_argument), kind=None, ctx=node.ctx
+            )
         else:
             return node
 
-    def _resolve_subscript(self, node: ast.Subscript) -> Optional[str]:
+    @staticmethod
+    def _resolve_subscript(node: ast.Subscript, input_arg: str, output_arg: str) -> Optional[str]:
         """
         Given an ast.Subscript node, translates its content into a Argo workflow parameter reference.
         """
-        if node.value.value.id == self.input_argument and node.value.attr == "parameters":
-            return "{{" + f"inputs.{node.value.attr}.{node.slice.value.value}" + "}}"
-        if node.value.value.id == self.input_argument and node.value.attr == "artifacts":
-            return "{{" + f"inputs.{node.value.attr}.{node.slice.value.value}.path" + "}}"
-        elif node.value.value.id == self.output_argument and node.value.attr == "parameters":
-            return "{{" + f"outputs.{node.value.attr}.{node.slice.value.value}" + "}}"
-        elif node.value.value.id == self.output_argument and node.value.attr == "artifacts":
-            return "{{" + f"outputs.{node.value.attr}.{node.slice.value.value}.path" + "}}"
+        node_attr = node.value
+        if not isinstance(node_attr, ast.Attribute):
+            raise NotImplementedError("Expected Attribute value for this node.")
+
+        attr_name = node_attr.value
+        if not isinstance(attr_name, ast.Name):
+            raise NotImplementedError("Expected Attribute to have name.")
+
+        node_slice = node.slice
+        if not isinstance(node_slice, ast.Index):
+            raise NotImplementedError("Expected slice to have an index.")
+
+        node_slice_val = node_slice.value
+        if not isinstance(node_slice_val, ast.Constant):
+            raise NotImplementedError("Expected slice value to be constant.")
+
+        if attr_name.id == input_arg and node_attr.attr == "parameters":
+            return "{{" + f"inputs.{node_attr.attr}.{node_slice_val.value}" + "}}"
+        if attr_name.id == input_arg and node_attr.attr == "artifacts":
+            return "{{" + f"inputs.{node_attr.attr}.{node_slice_val.value}.path" + "}}"
+        elif attr_name.id == output_arg and node_attr.attr == "parameters":
+            return "{{" + f"outputs.{node_attr.attr}.{node_slice_val.value}" + "}}"
+        elif attr_name.id == output_arg and node_attr.attr == "artifacts":
+            return "{{" + f"outputs.{node_attr.attr}.{node_slice_val.value}.path" + "}}"
         else:
             return None
 

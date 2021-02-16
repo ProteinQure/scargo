@@ -17,3 +17,20 @@ def test_resolve_string():
     )
 
     assert SourceToArgoTransformer._resolve_string(node) == r"add_alpha_{{inputs.parameters.init-value}}.txt"
+
+
+def test_resolve_subscript():
+    node = ast.Subscript(
+        value=ast.Attribute(
+            value=ast.Name(id="scargo_in"),
+            attr="parameters",
+        ),
+        slice=ast.Index(
+            value=ast.Constant(value="init-value", kind=None),
+        ),
+    )
+
+    assert (
+        SourceToArgoTransformer._resolve_subscript(node, input_arg="scargo_in", output_arg="scargo_out")
+        == r"{{inputs.parameters.init-value}}"
+    )
