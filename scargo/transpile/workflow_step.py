@@ -218,9 +218,11 @@ class WorkflowStep:
         Returns the source code for this workflow step.
         """
 
-        # get the names of the ScargoInput/ScargoOutput arguments
-        # in the docs, we demand the first argument to be ScargoInput and the
+        # Get the names of the ScargoInput/ScargoOutput arguments.
+        # In the docs, it is required the first argument to be ScargoInput and the
         # second to be ScargoOutput
+        # TODO: check argument types, instead of assuming
+        # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/19
         input_arg_name = self.functiondef_node.args.args[0].arg
         output_arg_name = self.functiondef_node.args.args[1].arg
 
