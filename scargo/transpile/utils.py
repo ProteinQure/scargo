@@ -8,7 +8,7 @@ from typing import Dict, NamedTuple, Optional, Union
 import yaml
 
 
-def hyphenate(text: str):
+def hyphenate(text: str) -> str:
     """
     Converts underscores to hyphens since Python functions use underscores
     whilst we tend to use hyphens for Argo template names.
@@ -82,7 +82,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         self.input_argument = input_argument
         self.output_argument = output_argument
 
-    def visit_Subscript(self, node: ast.Subscript) -> ast.Constant:
+    def visit_Subscript(self, node: ast.Subscript) -> Union[ast.Subscript, ast.Constant]:
         """
         Converts Subscript nodes that operate on the ScargoInput or
         ScargoOutput argument names into strings that refer to the
@@ -93,7 +93,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         else:
             return node
 
-    def _resolve_subscript(self, node: ast.Subscript) -> str:
+    def _resolve_subscript(self, node: ast.Subscript) -> Optional[str]:
         """
         Given an ast.Subscript node, this method translates its content into a
         Argo workflow parameter reference which can later be used in the Argo
@@ -110,7 +110,8 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         else:
             return None
 
-    def _resolve_string(self, node: Union[ast.Constant, ast.JoinedStr]) -> str:
+    @staticmethod
+    def _resolve_string(node: Union[ast.Constant, ast.JoinedStr]) -> str:
         """
         Given a node that either represent a normal string or an f-string,
         resolve the content of that string from the node.
@@ -153,6 +154,8 @@ class SourceToArgoTransformer(ast.NodeTransformer):
                 mode = "r"
             elif "outputs" in node.func.value.value:
                 mode = "w+"
+            else:
+                raise ValueError("Invalid output mode.")
 
             # get the prefix from the object whose `open` method is being called
             path_prefix = node.func.value.value
