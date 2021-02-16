@@ -2,21 +2,23 @@
 Integration tests for the `scargo` CLI. The `script_runner` fixture is provided
 by the `pytest-console-scripts` package in the `dev-dependencies`.
 """
+import os
 
 import pytest
 
+from scargo.paths import EXAMPLES_DIR
+
 
 @pytest.mark.script_launch_mode("subprocess")
-def test_scargo_transpile(script_runner, scargo_workflow_params_file, check_transpiled_params_file):
+def test_scargo_transpile(script_runner):
     """
     Test the `transpile` subcommand of the `scargo` CLI.
     """
-
-    result = script_runner.run("scargo", "transpile", scargo_workflow_params_file)
+    env = os.environ.copy()
+    env.update({"SCARGO_LOCAL_MOUNT": "/tmp"})
+    result = script_runner.run("scargo", "transpile", EXAMPLES_DIR / "python_step" / "python_step.py", env=env)
     assert result.success
     assert result.stderr == ""
-
-    check_transpiled_params_file(scargo_workflow_params_file)
 
 
 @pytest.mark.script_launch_mode("subprocess")

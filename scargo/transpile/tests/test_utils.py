@@ -17,4 +17,3 @@ def test_resolve_string():
     )
 
     assert SourceToArgoTransformer._resolve_string(node) == r"add_alpha_{{inputs.parameters.init-value}}.txt"
-
