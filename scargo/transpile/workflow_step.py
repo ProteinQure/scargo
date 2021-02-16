@@ -229,12 +229,14 @@ class WorkflowStep:
             copy.deepcopy(self.functiondef_node)
         )
 
-        source = ""
+        # TODO: format the output source with black
+        # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/20
+        source = []
         for node in converted_functiondef.body:
             if not isinstance(node, ast.Expr):  # if it's not a docstring
-                source += astor.to_source(node)
+                source.append(astor.to_source(node))
 
-        return source
+        return "".join(source)
 
     @property
     def inputs(self) -> Transput:
