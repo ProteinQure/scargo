@@ -10,17 +10,17 @@ import yaml
 
 def hyphenate(text: str) -> str:
     """
-    Converts underscores to hyphens since Python functions use underscores
-    whilst we tend to use hyphens for Argo template names.
+    Converts underscores to hyphens.
+
+    Python functions use underscores while Argo uses hyphens for Argo template names by convention.
     """
     return text.replace("_", "-")
 
 
 class Transput(NamedTuple):
     """
-    Transput is the hypernym of inputs & outputs. This named tuple provides
-    convenient access to the input (or output) parameters and artifacts of a
-    WorkflowStep.
+    Transput is the hypernym of inputs & outputs. Provides
+    access to the WorkflowStep input/output parameters and artifacts.
     """
 
     parameters: Optional[Dict] = None
@@ -38,7 +38,8 @@ class Transput(NamedTuple):
 class ArgoYamlDumper(yaml.SafeDumper):
     """
     Custom YAML dumper to generate Argo-compatible YAML files.
-    inspired by https://stackoverflow.com/a/44284819/3786245
+
+    Inspired by https://stackoverflow.com/a/44284819/3786245
     """
 
     def write_line_break(self, data=None) -> None:
@@ -54,16 +55,17 @@ class ArgoYamlDumper(yaml.SafeDumper):
 class SourceToArgoTransformer(ast.NodeTransformer):
     """
     Transforms the source code of a @scargo decorated function to be compatible
-    with Argo YAML. For example, any reference to the `ScargoInput` argument
+    with Argo YAML.
+
+    For example, any reference to the `ScargoInput` argument
     e.g. `scargo_in.parameters['x']` needs to be converted to
     `{{inputs.parameters.x}}`.
 
-    Usage example:
-        ```
-        tree = ast.parse(source_code_of_scargo_decorated_function)
-        # NOTE: changes tree in-place!! use copy.deepcopy if you want to avoid this
-        SourceToArgoTransformer("scargo_in", "scargo_out").visit(tree)
-        ```
+    Examples
+    --------
+    tree = ast.parse(source_code_of_scargo_decorated_function, type_comments=True)
+    # NOTE: changes tree in-place!! use copy.deepcopy if you want to avoid this
+    SourceToArgoTransformer("scargo_in", "scargo_out").visit(tree)
     """
 
     def __init__(self, input_argument: str, output_argument: str):
@@ -84,8 +86,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
 
     def visit_Subscript(self, node: ast.Subscript) -> Union[ast.Subscript, ast.Constant]:
         """
-        Converts Subscript nodes that operate on the ScargoInput or
-        ScargoOutput argument names into strings that refer to the
+        Converts Subscript nodes operating on ScargoInput/ScargoOutput argument names into strings refering to the
         inputs/outputs parameters/artifacts.
         """
         if self._resolve_subscript(node):
@@ -95,9 +96,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
 
     def _resolve_subscript(self, node: ast.Subscript) -> Optional[str]:
         """
-        Given an ast.Subscript node, this method translates its content into a
-        Argo workflow parameter reference which can later be used in the Argo
-        YAML workflow file.
+        Given an ast.Subscript node, translates its content into a Argo workflow parameter reference.
         """
         if node.value.value.id == self.input_argument and node.value.attr == "parameters":
             return "{{" + f"inputs.{node.value.attr}.{node.slice.value.value}" + "}}"

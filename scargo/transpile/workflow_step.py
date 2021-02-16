@@ -96,7 +96,7 @@ class WorkflowStep:
 
     def _resolve_workflow_param(self, node: ast.Subscript) -> str:
         """
-        Given a Subscript or Constant node (`raw_parameter`) this method uses the
+        Given a Subscript or Constant node use the
         locals_context of the scargo script and the AST to transpile this node
         either into the actual parameter value or into a reference to the
         global Argo workflow parameters.
