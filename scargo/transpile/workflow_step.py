@@ -213,10 +213,13 @@ class WorkflowStep:
         return artifact
 
     @property
-    def source_code(self) -> str:
+    def source_code(self) -> Optional[str]:
         """
         Returns the source code for this workflow step.
         """
+
+        if self.functiondef_node is None:
+            return None
 
         # Get the names of the ScargoInput/ScargoOutput arguments.
         # In the docs, it is required the first argument to be ScargoInput and the
