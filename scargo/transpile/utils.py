@@ -126,16 +126,20 @@ class SourceToArgoTransformer(ast.NodeTransformer):
 
     def visit_Call(self, node: ast.Call) -> ast.Call:
         """
-        Custom visitor method for ast.Call nodes. The main point of this method
-        is to identify calls to `open()` methods on `FileInput` or `FileOutput`
-        objects and modifying the call node in such a way that the file
-        read/write operation works in an Argo workflow. This mainly means
-        piecing together the path to the file and using it as part of the
-        built-in `open()` function (instead of the `open()` method on e.g.
-        `FileOutput`).
+        Custom visitor method for ast.Call nodes.
+
+        Performs transpiling by:
+
+        1. Identifying calls to `open()` methods on `FileInput` or `FileOutput` objects.
+        2. Modifying the call node in such a way that the file read/write operation works in an Argo workflow.
+
+        Accomplished by:
+
+        1. Assembling the path to the file from the `open()` method from `FileOutput` or `FileInput`.
+        2. Converting it to the built-in `open()` function with Argo compatible paths.
         """
-        # visit child nodes since we want to ensure that all nested Subscript
-        # nodes are getting transformed by `visit_Subscript`
+
+        # Visit child nodes to ensure all nested Call nodes are transformed by `visit_Call`.
         self.generic_visit(node)
 
         if isinstance(node.func, ast.Attribute) and node.func.attr == "open":
