@@ -177,7 +177,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
             elif "outputs" in node.func.value.value:
                 mode = "w+"
             else:
-                raise ValueError("Invalid output mode.")
+                raise NotImplementedError("Invalid output mode.")
 
             # get the prefix from the object whose `open` method is being called
             path_prefix = node.func.value.value
