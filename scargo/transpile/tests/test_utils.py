@@ -4,6 +4,10 @@ from scargo.transpile.utils import SourceToArgoTransformer
 
 
 def test_resolve_string():
+    """
+    Testing if a JoinedStr node representing an f-string is correctly resolved
+    by the SourceToArgoTransformer.
+    """
     node = ast.JoinedStr(
         values=[
             ast.Constant(value="add_alpha_", kind=None),
@@ -20,6 +24,10 @@ def test_resolve_string():
 
 
 def test_resolve_subscript():
+    """
+    Testing if a Subscript node is correctly resolved
+    by the SourceToArgoTransformer.
+    """
     node = ast.Subscript(
         value=ast.Attribute(
             value=ast.Name(id="scargo_in"),

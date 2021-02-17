@@ -162,7 +162,8 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         2. Converting it to the built-in `open()` function with Argo compatible paths.
         """
 
-        # Visit child nodes to ensure all nested Call nodes are transformed by `visit_Call`.
+        # Visit child nodes to ensure all nested nodes are transformed by the
+        # custom `visit_Call` and `visit_Subscript` methods
         self.generic_visit(node)
 
         if isinstance(node.func, ast.Attribute) and node.func.attr == "open":
