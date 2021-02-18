@@ -1,6 +1,6 @@
 import ast
 
-from scargo.transpile.utils import SourceToArgoTransformer
+from scargo.transpile.transformer import SourceToArgoTransformer
 
 
 def test_resolve_string():

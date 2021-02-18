@@ -6,12 +6,19 @@ import astor
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.utils import hyphenate, SourceToArgoTransformer, Transput
+from scargo.transpile.utils import hyphenate, Transput
+from scargo.transpile.transformer import SourceToArgoTransformer
 
 
 class WorkflowStep:
     """
     A single step/template in the workflow.
+
+    Transforms @scargo functions into Argo-compatible workflow functions.
+
+    Specifically, transpile.build_template() uses the properties:
+     - `.inputs` and others to provide the Argo template definition
+     - `.template` to provide the Argo template implementation
     """
 
     def __init__(self, call_node: ast.Call, locals_context: Dict, tree: ast.Module) -> None:
@@ -33,6 +40,7 @@ class WorkflowStep:
         """
         self.call_node = call_node
         self.locals_context = locals_context
+        # TODO: the context extracted from the tree should be passed as an argument, instead of processed in this class
         self.tree = tree
 
     @property
@@ -177,6 +185,7 @@ class WorkflowStep:
         elif self._is_mount_points(subscripted_object_name):
             return self._resolve_mount_points(node)
         else:
+            # TODO: should this error only be triggered if it also isn't resolvable via the locals of the function?
             raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
 
     def _transpile_artifact(self, raw_artifact: Union[ast.Constant, ast.Call], output: bool) -> Dict[str, Any]:
@@ -229,7 +238,7 @@ class WorkflowStep:
         input_arg_name = self.functiondef_node.args.args[0].arg
         output_arg_name = self.functiondef_node.args.args[1].arg
 
-        # write a general function that resolves f-strings with WorkflowParams/MountPoints
+        # Resolves f-strings with WorkflowParams/MountPoints
         converted_functiondef = SourceToArgoTransformer(input_arg_name, output_arg_name).visit(
             copy.deepcopy(self.functiondef_node)
         )

@@ -4,7 +4,7 @@ Testing the Transpiler classes.
 
 from pathlib import Path
 
-from scargo.transpile.transpiler import ScargoTranspiler
+from scargo.transpile import transpiler
 
 
 def test_transpile_parameters(scargo_workflow_params_file):
@@ -14,9 +14,11 @@ def test_transpile_parameters(scargo_workflow_params_file):
     """
 
     # try to transpile the Python scargo script with the workflow parameters only
-    scargo_workflow_params_file = Path(scargo_workflow_params_file)
-    script_locals = ScargoTranspiler._get_script_locals(scargo_workflow_params_file)
-    workflow_params = ScargoTranspiler.transpile_parameters(script_locals)
+    with Path(scargo_workflow_params_file).open("r") as fi:
+        source = fi.read()
+
+    script_locals = transpiler.get_script_locals(source)
+    workflow_params = transpiler.transpile_parameters(script_locals)
 
     expected_workflow_params = {
         "s3-bucket": "pq-dataxfer-tmp",
