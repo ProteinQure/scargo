@@ -27,7 +27,7 @@ def run_bash_step(bash_template: Path, scargo_input: ScargoInput, scargo_output:
     Parameters
     ----------
     bash_template : Path
-        File path to jinja2-like template, where variables to be filled are formatted between curly braces
+        File path to template, where variables to be filled are formatted between doubled curly braces
     scargo_input : ScargoInput
         Scargo Input Artifacts and Parameters used to fill `bash_template`
     scargo_output : ScargoOutput

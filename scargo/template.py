@@ -1,3 +1,8 @@
+"""
+Functions for filling a template's variables with ScargoInput and ScargoOutput variables. Currently only used for Bash
+scripts, but is generalizable to other file types.
+"""
+
 import re
 from typing import List, Literal, Match, NamedTuple, Tuple
 

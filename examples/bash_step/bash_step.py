@@ -1,5 +1,6 @@
 """
-Run a single bash step which generates a textfile artifact output.
+Run a single bash step which processes a CSV file artifact (add_alpha.csv) and generates a single text file artifact
+(command_types.txt) as output.
 """
 
 from pathlib import Path

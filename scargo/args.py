@@ -64,7 +64,7 @@ class FileOutput(NamedTuple):
         String representation for filling bash templates.
         """
         if self.name is None:
-            raise ValueError("name must be set to provie full string to fill bash template")
+            raise ValueError("name must be set to provide value to fill bash template")
         else:
             return str(self.root.local / self.path / self.name)
 
