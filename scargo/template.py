@@ -205,7 +205,7 @@ def fill_template(tmpl_lines: List[str], scargo_in: ScargoInput, scargo_out: Sca
     missing_vars = get_missing_vars(all_vars, scargo_in, scargo_out)
     if len(missing_vars) > 0:
         err_str = f"{len(missing_vars)} template variables were not provided:\n" + "\n".join(
-            [f"  Line {l_i}, {line_var.location.start}: {line_var.name}" for l_i, line_var in missing_vars]
+            [f"  Line {l_i+1}, {line_var.location.start}: {line_var.name}" for l_i, line_var in missing_vars]
         )
         raise ValueError(err_str)
 
