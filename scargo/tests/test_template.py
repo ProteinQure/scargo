@@ -7,6 +7,8 @@ from scargo.template import BashVar, extract_vars_from_str, get_bash_vars, get_m
 
 
 def test_get_vars_single_line():
+    # get_vars should find two variables (input-csv, output-csv) at line 0
+    result = get_vars(["cat {{inputs.artifacts.input-csv}} | cut -d ',' -f 1 > {{outputs.artifacts.output-csv}}"])
     expected = [
         (
             0,
@@ -16,31 +18,11 @@ def test_get_vars_single_line():
             ],
         )
     ]
-    result = get_vars(["cat {{inputs.artifacts.input-csv}} | cut -d ',' -f 1 > {{outputs.artifacts.output-csv}}"])
     assert result == expected
 
 
 def test_get_vars_multi_line():
-    expected = [
-        (4, [BashVar(var_type="outputs", io_type="artifacts", name="extracted-pdb", location=slice(14, 49))]),
-        (7, [BashVar(var_type="inputs", io_type="artifacts", name="sequence-file", location=slice(8, 42))]),
-        (8, [BashVar(var_type="inputs", io_type="artifacts", name="pdb-file", location=slice(8, 37))]),
-        (17, [BashVar(var_type="inputs", io_type="artifacts", name="sequence-file", location=slice(30, 64))]),
-        (20, [BashVar(var_type="inputs", io_type="artifacts", name="pdb-file", location=slice(16, 45))]),
-        (22, [BashVar(var_type="inputs", io_type="parameters", name="nstruct", location=slice(13, 42))]),
-        (23, [BashVar(var_type="inputs", io_type="parameters", name="unique-id", location=slice(12, 43))]),
-        (25, [BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(17, 50))]),
-        (
-            28,
-            [
-                BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(11, 44)),
-                BashVar(var_type="outputs", io_type="artifacts", name="score-file", location=slice(47, 79)),
-            ],
-        ),
-        (31, [BashVar(var_type="outputs", io_type="artifacts", name="extracted-pdb", location=slice(3, 38))]),
-        (33, [BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(16, 49))]),
-        (34, [BashVar(var_type="inputs", io_type="parameters", name="pdb-file-name", location=slice(12, 47))]),
-    ]
+    # this multi-line Rosetta script is used as test input to get_vars, it's actual function is irrelevant
     lines = [
         "#!/bin/bash\n",
         "\n",
@@ -78,8 +60,30 @@ def test_get_vars_multi_line():
         "-in:file:silent {{outputs.artifacts.silent-file}} \\\n",
         "-out:prefix {{inputs.parameters.pdb-file-name}}-",
     ]
-    result = get_vars(lines)
-    assert result == expected
+
+    # get_vars returns (line_number, list_of_bash_vars) while omitting lines without variables
+    expected = [
+        (4, [BashVar(var_type="outputs", io_type="artifacts", name="extracted-pdb", location=slice(14, 49))]),
+        (7, [BashVar(var_type="inputs", io_type="artifacts", name="sequence-file", location=slice(8, 42))]),
+        (8, [BashVar(var_type="inputs", io_type="artifacts", name="pdb-file", location=slice(8, 37))]),
+        (17, [BashVar(var_type="inputs", io_type="artifacts", name="sequence-file", location=slice(30, 64))]),
+        (20, [BashVar(var_type="inputs", io_type="artifacts", name="pdb-file", location=slice(16, 45))]),
+        (22, [BashVar(var_type="inputs", io_type="parameters", name="nstruct", location=slice(13, 42))]),
+        (23, [BashVar(var_type="inputs", io_type="parameters", name="unique-id", location=slice(12, 43))]),
+        (25, [BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(17, 50))]),
+        (
+            28,
+            [
+                BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(11, 44)),
+                BashVar(var_type="outputs", io_type="artifacts", name="score-file", location=slice(47, 79)),
+            ],
+        ),
+        (31, [BashVar(var_type="outputs", io_type="artifacts", name="extracted-pdb", location=slice(3, 38))]),
+        (33, [BashVar(var_type="outputs", io_type="artifacts", name="silent-file", location=slice(16, 49))]),
+        (34, [BashVar(var_type="inputs", io_type="parameters", name="pdb-file-name", location=slice(12, 47))]),
+    ]
+
+    assert get_vars(lines) == expected
 
 
 @pytest.mark.parametrize(
