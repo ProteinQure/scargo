@@ -57,9 +57,10 @@ def extract_vars_from_str(tmpl_lines: List[str]) -> Tuple[LineMatches, int]:
     return all_vars, total_vars
 
 
-def get_bash_vars(all_vars: LineMatches) -> LineBashVars:
+def triage_vars(all_vars: LineMatches) -> LineBashVars:
     """
-    Convert bash template variable matches in each line to Scargo-compatible variables.
+    Convert valid bash template variable matches in each line to Scargo-compatible variables, while also collecting
+    invalid variables to create a detailed error messages.
     """
     all_bash_vars = []
     invalid_vars = []
@@ -126,7 +127,7 @@ def get_vars(tmpl_lines: List[str]) -> LineBashVars:
     if total_vars == 0:
         raise ValueError("No variables found in template.")
     else:
-        return get_bash_vars(all_vars)
+        return triage_vars(all_vars)
 
 
 def get_missing_vars(

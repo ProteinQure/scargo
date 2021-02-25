@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scargo.args import FileInput, FileOutput, ScargoInput, ScargoOutput, MountPoint
-from scargo.template import BashVar, extract_vars_from_str, get_bash_vars, get_missing_vars, get_vars, replace_vars
+from scargo.template import BashVar, extract_vars_from_str, triage_vars, get_missing_vars, get_vars, replace_vars
 
 
 def test_get_vars_single_line():
@@ -133,10 +133,10 @@ def test_extract_vars_from_str_no_vars():
 
 
 @pytest.mark.parametrize("bad_str", ["This {{bad-format}} str", "{{also.bad}} str", "str {{so.bad.its.worse}}"])
-def test_get_bash_vars_invalid_format(bad_str):
+def test_triage_vars_invalid_format(bad_str):
     all_vars, _ = extract_vars_from_str([bad_str])
     with pytest.raises(ValueError) as err:
-        get_bash_vars(all_vars)
+        triage_vars(all_vars)
 
     assert "Invalid variable format" in str(err.value)
 
@@ -144,10 +144,10 @@ def test_get_bash_vars_invalid_format(bad_str):
 @pytest.mark.parametrize(
     "bad_str", ["This {{input.artifacts.bad}} str", "{{output.artifacts.output-csv}} str", "str {{nope.okay.what}}"]
 )
-def test_get_bash_vars_invalid_type(bad_str):
+def test_triage_vars_invalid_type(bad_str):
     all_vars, _ = extract_vars_from_str([bad_str])
     with pytest.raises(ValueError) as err:
-        get_bash_vars(all_vars)
+        triage_vars(all_vars)
 
     assert "Invalid variable type" in str(err.value)
 
@@ -155,10 +155,10 @@ def test_get_bash_vars_invalid_type(bad_str):
 @pytest.mark.parametrize(
     "bad_str", ["This {{inputs.artifact.bad}} str", "{{outputs.parameter.output-csv}} str", "str {{inputs.okay.what}}"]
 )
-def test_get_bash_vars_invalid_io_type(bad_str):
+def test_triage_vars_invalid_io_type(bad_str):
     all_vars, _ = extract_vars_from_str([bad_str])
     with pytest.raises(ValueError) as err:
-        get_bash_vars(all_vars)
+        triage_vars(all_vars)
 
     assert "Invalid IO type" in str(err.value)
 
@@ -171,10 +171,10 @@ def test_get_bash_vars_invalid_io_type(bad_str):
         "str {{inputs.parameters.why*bad&name}}",
     ],
 )
-def test_get_bash_vars_multi_invalid(bad_str):
+def test_triage_vars_multi_invalid(bad_str):
     all_vars, _ = extract_vars_from_str([bad_str])
     with pytest.raises(ValueError) as err:
-        get_bash_vars(all_vars)
+        triage_vars(all_vars)
 
     assert "Invalid variable name" in str(err.value)
 
