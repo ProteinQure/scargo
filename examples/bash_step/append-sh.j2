@@ -1,1 +1,2 @@
+mkdir -p $(dirname {{outputs.artifacts.txt-out}})
 cat {{inputs.artifacts.input-csv}} | cut -d ',' -f 1 > {{outputs.artifacts.txt-out}}
