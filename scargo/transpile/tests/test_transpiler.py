@@ -18,7 +18,7 @@ def test_transpile_parameters(scargo_workflow_params_file):
         source = fi.read()
 
     script_locals = transpiler.get_script_locals(source)
-    workflow_params = transpiler.transpile_parameters(script_locals)
+    workflow_params = transpiler.transpile_workflow_parameters(script_locals)
 
     expected_workflow_params = {
         "s3-bucket": "pq-dataxfer-tmp",

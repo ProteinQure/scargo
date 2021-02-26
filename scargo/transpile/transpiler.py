@@ -9,11 +9,12 @@ from typing import Any, Dict, List, Union
 import astpretty
 
 from scargo.core import WorkflowParams
+from scargo.transpile.workflow_step import WorkflowStep
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import entrypoint, yaml_io
 
 
-def transpile_parameters(script_locals: Dict[str, Any]) -> WorkflowParams:
+def transpile_workflow_parameters(script_locals: Dict[str, Any]) -> WorkflowParams:
     """
     Retrieves the global workflow parameters from the scargo Python script
     and writes them to YAML.
@@ -41,7 +42,12 @@ def get_script_locals(source: str) -> Dict[str, Any]:
     return script_locals
 
 
-def build_template(hyphenated_script_name, workflow_params, entrypoint_name: str, workflow_steps) -> Dict[str, Any]:
+def build_template(
+    hyphenated_script_name: str,
+    workflow_params: WorkflowParams,
+    entrypoint_name: str,
+    workflow_steps: List[List[WorkflowStep]],
+) -> Dict[str, Any]:
     """
     Convert the script to AST, traverse the tree and transpile the Python
     statements to an Argo workflow.
@@ -51,7 +57,7 @@ def build_template(hyphenated_script_name, workflow_params, entrypoint_name: str
     transpiled_workflow = {
         "apiVersion": "argoproj.io/v1alpha1",
         "kind": "Workflow",
-        "metadata": {"generateName": f"scargo-{hyphenated_script_name}-"},  # will be defined in self.transpile()
+        "metadata": {"generateName": f"scargo-{hyphenated_script_name}-"},
         "spec": {
             "entrypoint": entrypoint_name,
             "volumes": [{"name": "workdir", "emptyDir": {}}],
@@ -60,36 +66,45 @@ def build_template(hyphenated_script_name, workflow_params, entrypoint_name: str
 
     transpiled_workflow["spec"]["arguments"] = {"parameters": [{"name": name} for name in workflow_params]}
 
-    # add entrypoint template
+    # add entrypoint and define the corresponding workflow steps templates
     templates = []
+
+    workflow_steps[0][0].inputs
+    workflow_steps[0][0].outputs
+    entrypoint_steps = []
+    for step_group in workflow_steps:
+        for step in step_group:
+            step_template = {
+                "name": step.hyphenated_name,
+                "template": step.template_name,
+                "arguments": {
+                    "parameters": [
+                        {
+                            "name": name,
+                            "value": value,
+                        }
+                        for name, value in step.inputs.parameters.items()
+                    ]
+                },
+            }
+            if step.condition is not None:
+                step_template["when"] = step.condition
+
+            entrypoint_steps.append(step_template)
+
     entrypoint_template = {
         "name": entrypoint_name,
-        "steps": [
-            [
-                {
-                    "name": step.hyphenated_name,
-                    "template": step.template_name,
-                    "arguments": {
-                        "parameters": [
-                            {
-                                "name": name,
-                                "value": value,
-                            }
-                            for name, value in step.inputs.parameters.items()
-                        ]
-                    },
-                }
-                for step in workflow_steps
-            ]
-        ],
+        "steps": [entrypoint_steps],
     }
     templates.append(entrypoint_template)
 
-    # add templates for the individual workflow steps
-    for step in workflow_steps:
-        templates.append(step.template)
+    # add template implementations for the individual workflow steps
+    for step_group in workflow_steps:
+        for step in step_group:
+            templates.append(step.template)
 
-    # update the transpiled workflow and write to YAML
+    # all templates, including the entrypoint, it's corresponding steps and step-implementation templates fall under the
+    # spec -> templates fields of an Argo Workflow
     transpiled_workflow["spec"]["templates"] = templates
     return transpiled_workflow
 
@@ -144,16 +159,17 @@ def transpile(path_to_script: Union[str, Path]) -> None:
 
     tree = ast.parse(source)
 
-    # transpile the parameters and write them to a separate YAML file
+    # parse the workflow parameters and transpile them to a separate YAML file
     script_locals = get_script_locals(source)
-    workflow_params = transpile_parameters(script_locals)
+    workflow_params = transpile_workflow_parameters(script_locals)
     yaml_io.write_params_to_yaml(path_to_script, workflow_params)
 
+    # parse the entrypoint function and it's corresponding steps into a transpilable format
     entrypoint_func = find_entrypoint(tree)
     entrypoint_transpiler = entrypoint.EntrypointTranspiler(script_locals, tree)
     entrypoint_transpiler.visit(entrypoint_func)
 
-    # create the Argo workflow YAML
+    # transpile the data structures from the previous steps into Argo workflow YAML
     transpiled_workflow = build_template(
         hyphenated_script_name,
         workflow_params,
