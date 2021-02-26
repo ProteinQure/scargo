@@ -28,7 +28,15 @@ class EntrypointTranspiler(ast.NodeVisitor):
         """
         # TODO: easier to read if transput were resolved and passed
         self.steps.append(
-            [WorkflowStep(call_node=node, context_inputs=self.inputs, context_outputs=self.outputs, tree=self.tree)]
+            [
+                WorkflowStep(
+                    call_node=node,
+                    locals_context=self.script_locals,
+                    context_inputs=self.inputs,
+                    context_outputs=self.outputs,
+                    tree=self.tree,
+                )
+            ]
         )
 
     @staticmethod
@@ -112,6 +120,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
             return WorkflowStep(
                 call_node=body.value,
                 tree=self.tree,
+                locals_context=self.script_locals,
                 context_inputs=self.inputs,
                 context_outputs=self.outputs,
                 condition=condition,

@@ -24,7 +24,13 @@ class WorkflowStep:
     """
 
     def __init__(
-        self, call_node: ast.Call, tree: ast.Module, context_inputs, context_outputs, condition: Optional[str] = None
+        self,
+        call_node: ast.Call,
+        tree: ast.Module,
+        locals_context: Dict[str, Any],
+        context_inputs,
+        context_outputs,
+        condition: Optional[str] = None,
     ) -> None:
         """
         Create a new WorkflowStep.
@@ -43,6 +49,7 @@ class WorkflowStep:
             The entire (!) Abstract Syntax Tree of the Python scargo script.
         """
         self.call_node = call_node
+        self.locals_context = locals_context
         self.context_inputs = context_inputs
         self.context_outputs = context_outputs
         # TODO: the context extracted from the tree should be passed as an argument, instead of processed in this class
@@ -134,8 +141,7 @@ class WorkflowStep:
         input_node = utils.get_variable_from_args_or_kwargs(self.call_node, "scargo_in", 0)
 
         if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
-            # TODO: somehow exec the call node
-            scargo_input = Transput()
+            scargo_input = utils.resolve_transput(input_node, self.locals_context, self.tree)
         elif isinstance(input_node, ast.Name) and isinstance(self.context_inputs[input_node.id], Transput):
             scargo_input = self.context_inputs[input_node.id]
         else:
@@ -154,8 +160,7 @@ class WorkflowStep:
         """
         output_node = utils.get_variable_from_args_or_kwargs(self.call_node, "scargo_out", 1)
         if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
-            # TODO: somehow exec the call node
-            scargo_output = Transput()
+            scargo_output = utils.resolve_transput(output_node, self.locals_context, self.tree)
         elif isinstance(output_node, ast.Name) and isinstance(self.context_outputs[output_node.id], Transput):
             scargo_output = self.context_outputs[output_node.id]
         else:
