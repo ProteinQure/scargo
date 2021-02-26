@@ -7,6 +7,7 @@ from pathlib import Path
 
 PKG_ROOT_DIR = Path(__file__).resolve().parents[1]
 EXAMPLES_DIR = PKG_ROOT_DIR / "examples"
+EXAMPLES_DATA = EXAMPLES_DIR / "data" / "testing" / "scargo-examples"
 
 
 def env_local_mountpoint() -> Path:
