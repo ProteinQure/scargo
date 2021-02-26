@@ -195,4 +195,4 @@ def resolve_transput(transput_node: ast.Call, locals_context: Dict[str, Any], tr
     if artifacts is None and parameters is None:
         raise ScargoTranspilerError("Empty transput")
 
-    return Transput(parameters=parameters)
+    return Transput(parameters=parameters, artifacts=artifacts)

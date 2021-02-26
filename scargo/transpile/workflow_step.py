@@ -196,7 +196,7 @@ class WorkflowStep:
                         "path": "/workdir/out",
                         "s3": {
                             "endpoint": "s3.amazonaws.com",
-                            "bucket": file_output.root.remote,
+                            "bucket": file_output.root,
                             "key": file_output.path,
                         },
                     }

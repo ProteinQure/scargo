@@ -1,6 +1,11 @@
 from typing import Dict, NamedTuple, Optional
 
 
+class FilePut(NamedTuple):
+    root: str
+    path: str
+
+
 class Transput(NamedTuple):
     """
     Transput is the hypernym of inputs & outputs. Provides
@@ -8,7 +13,7 @@ class Transput(NamedTuple):
     """
 
     parameters: Optional[Dict[str, str]] = None
-    artifacts: Optional[Dict[str, str]] = None
+    artifacts: Optional[Dict[str, FilePut]] = None
 
     @property
     def exist(self) -> bool:
@@ -17,8 +22,3 @@ class Transput(NamedTuple):
         empty dict.
         """
         return (self.parameters is None or not self.parameters) or (self.artifacts is None or not self.artifacts)
-
-
-class FilePut(NamedTuple):
-    root: str
-    path: str
