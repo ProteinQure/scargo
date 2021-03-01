@@ -4,6 +4,7 @@ Core functionality of the Python -> Argo YAML transpiler.
 
 import ast
 from pathlib import Path
+from scargo.transpile.types import Transput
 from typing import Any, Dict, List, Union
 
 import astpretty
@@ -42,6 +43,42 @@ def get_script_locals(source: str) -> Dict[str, Any]:
     return script_locals
 
 
+def build_step_template(step: WorkflowStep, all_outputs: Dict[str, str]) -> Dict[str, Any]:
+    all_parameters = []
+
+    for name, value in step.inputs.parameters.items():
+        if isinstance(value, Transput):
+            # TODO: step.inputs.parameters -> value should not be a whole Transput?
+            prev_step_output = list(value.parameters.keys())
+            assert len(prev_step_output) == 1
+            prev_step_param = prev_step_output[0]
+            all_parameters.append(
+                {
+                    "name": name,
+                    "value": "{{"
+                    + f"steps.{all_outputs[prev_step_param]}-compute.outputs.parameters.{prev_step_param}"
+                    + "}}",
+                }
+            )
+        else:
+            all_parameters.append(
+                {
+                    "name": name,
+                    "value": value,
+                }
+            )
+
+    step_template = {
+        "name": step.hyphenated_name,
+        "template": step.template_name,
+        "arguments": {"parameters": all_parameters},
+    }
+    if step.condition is not None:
+        step_template["when"] = step.condition
+
+    return step_template
+
+
 def build_template(
     hyphenated_script_name: str,
     workflow_params: WorkflowParams,
@@ -51,6 +88,8 @@ def build_template(
     """
     Convert the script to AST, traverse the tree and transpile the Python
     statements to an Argo workflow.
+
+    # TODO: add whitespace to make output more readable
     """
     # initialize the transpiled workflow dictionary
     # with the typical Argo header
@@ -71,26 +110,17 @@ def build_template(
 
     workflow_steps[0][0].inputs
     workflow_steps[0][0].outputs
+
+    all_outputs = dict()
+
     entrypoint_steps = []
     for step_group in workflow_steps:
         for step in step_group:
-            step_template = {
-                "name": step.hyphenated_name,
-                "template": step.template_name,
-                "arguments": {
-                    "parameters": [
-                        {
-                            "name": name,
-                            "value": value,
-                        }
-                        for name, value in step.inputs.parameters.items()
-                    ]
-                },
-            }
-            if step.condition is not None:
-                step_template["when"] = step.condition
+            if step.outputs.parameters is not None:
+                for output in step.outputs.parameters.keys():
+                    all_outputs[output] = step.hyphenated_name
 
-            entrypoint_steps.append(step_template)
+            entrypoint_steps.append(build_step_template(step, all_outputs))
 
     entrypoint_template = {
         "name": entrypoint_name,

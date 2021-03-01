@@ -1,4 +1,4 @@
-from typing import Dict, NamedTuple, Optional
+from typing import Any, Dict, NamedTuple, Optional
 
 
 class FilePut(NamedTuple):
@@ -22,3 +22,9 @@ class Transput(NamedTuple):
         empty dict.
         """
         return (self.parameters is None or not self.parameters) or (self.artifacts is None or not self.artifacts)
+
+
+class Context(NamedTuple):
+    locals: Dict[str, Any]
+    inputs: Dict[str, Transput]
+    outputs: Dict[str, Transput]

@@ -1,10 +1,10 @@
 import ast
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import astor
 
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.types import Transput
+from scargo.transpile.types import Context
 from scargo.transpile import utils
 from scargo.transpile.workflow_step import WorkflowStep
 
@@ -13,11 +13,9 @@ class EntrypointTranspiler(ast.NodeVisitor):
     def __init__(self, script_locals, tree) -> None:
         # TODO: there should be an alternative to importing all the locals from the global scope
         # mount_points and workflow_params should be saved in it's own attribute
-        self.script_locals = script_locals
         self.tree = tree
         self.steps: List[List[WorkflowStep]] = []
-        self.inputs: Dict[str, Transput] = {}
-        self.outputs: Dict[str, Transput] = {}
+        self.context = Context(locals=script_locals, inputs={}, outputs={})
 
     def visit_Call(self, node: ast.Call):
         """
@@ -31,9 +29,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
             [
                 WorkflowStep(
                     call_node=node,
-                    locals_context=self.script_locals,
-                    context_inputs=self.inputs,
-                    context_outputs=self.outputs,
+                    context=self.context,
                     tree=self.tree,
                 )
             ]
@@ -43,9 +39,10 @@ class EntrypointTranspiler(ast.NodeVisitor):
     def _scargo_transput(node: ast.Assign) -> Optional[str]:
         call_func = node.value
         if isinstance(call_func, ast.Call):
-            if call_func.func.id == "ScargoInput":
+            func_name = call_func.func.id
+            if func_name == "ScargoInput":
                 return "ScargoInput"
-            elif call_func.func.id == "ScargoOutput":
+            elif func_name == "ScargoOutput":
                 return "ScargoOutput"
             else:
                 return None
@@ -66,20 +63,25 @@ class EntrypointTranspiler(ast.NodeVisitor):
             if len(node.targets) > 1:
                 raise ScargoTranspilerError("Multiple assignment not supported by Scargo Transpiler.")
 
-            resolved_transput = utils.resolve_transput(call_func, locals_context=self.script_locals, tree=self.tree)
+            resolved_transput = utils.resolve_transput(
+                call_func,
+                context=Context(locals=self.context.locals, inputs=self.context.inputs, outputs=self.context.outputs),
+                tree=self.tree,
+            )
+            transput_name = node.targets[0].id
             if transput == "ScargoInput":
-                self.inputs[node.targets[0].id] = resolved_transput
+                self.context.inputs[transput_name] = resolved_transput
             else:
-                self.outputs[node.targets[0].id] = resolved_transput
+                self.context.outputs[transput_name] = resolved_transput
         else:
-            exec(astor.to_source(node), {}, self.script_locals)
+            exec(astor.to_source(node), {}, self.context.locals)
 
     def _resolve_compare(self, node: ast.expr) -> str:
         """
         TODO: allow for other comparison inputs, such as Transputs and CSV values
         """
-        if isinstance(node, ast.Subscript) and utils.is_workflow_param(node.value.id, self.script_locals):
-            return utils.resolve_workflow_param(node, self.script_locals)
+        if isinstance(node, ast.Subscript) and utils.is_workflow_param(node.value.id, self.context.locals):
+            return utils.resolve_workflow_param(node, self.context.locals)
         elif isinstance(node, ast.Constant):
             return str(node.value)
         else:
@@ -120,9 +122,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
             return WorkflowStep(
                 call_node=body.value,
                 tree=self.tree,
-                locals_context=self.script_locals,
-                context_inputs=self.inputs,
-                context_outputs=self.outputs,
+                context=self.context,
                 condition=condition,
             )
         else:

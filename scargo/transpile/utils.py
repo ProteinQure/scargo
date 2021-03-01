@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.types import Transput, FilePut
+from scargo.transpile.types import Context, Transput, FilePut
 
 
 def hyphenate(text: str) -> str:
@@ -144,11 +144,11 @@ def resolve_artifact(artifact_node: ast.Call, locals_context: Dict[str, Any], tr
     )
 
 
-def resolve_transput(transput_node: ast.Call, locals_context: Dict[str, Any], tree: ast.Module) -> Transput:
+def resolve_transput(transput_node: ast.Call, context: Context, tree: ast.Module) -> Transput:
     # TODO: use exec to resolve transput as an initial sanity check
     parameters = None
     artifacts = None
-    node_args = get_variables_from_args_and_kwargs(transput_node, locals_context)
+    node_args = get_variables_from_args_and_kwargs(transput_node, context.locals)
 
     if "parameters" in node_args:
         raw_parameters = node_args["parameters"]
@@ -164,7 +164,18 @@ def resolve_transput(transput_node: ast.Call, locals_context: Dict[str, Any], tr
             if isinstance(value, ast.Constant):
                 parameters[name.value] = value.value
             elif isinstance(value, ast.Subscript):
-                parameters[name.value] = resolve_subscript(value, locals_context, tree)
+                subscript = value.value
+                if isinstance(subscript, ast.Attribute):
+                    assert subscript.attr == "parameters"
+                    attr_name = subscript.value.id
+                    if attr_name in context.inputs:
+                        parameters[name.value] = context.inputs[attr_name]
+                    elif attr_name in context.outputs:
+                        parameters[name.value] = context.outputs[attr_name]
+                    else:
+                        raise ScargoTranspilerError("Only ScargoInput and ScargoOutput work.")
+                else:
+                    parameters[name.value] = resolve_subscript(value, context.locals, tree)
             else:
                 raise ScargoTranspilerError("Should be a subscript or a constant?")
 
@@ -185,7 +196,7 @@ def resolve_transput(transput_node: ast.Call, locals_context: Dict[str, Any], tr
             if isinstance(value, ast.Constant):
                 artifacts[name.value] = value.value
             elif isinstance(value, ast.Call):
-                artifacts[name.value] = resolve_artifact(value, locals_context, tree)
+                artifacts[name.value] = resolve_artifact(value, context.locals, tree)
             else:
                 raise ScargoTranspilerError("Unrecognized assignment for artifact.")
 

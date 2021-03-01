@@ -7,7 +7,7 @@ import astor
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import utils
 from scargo.transpile.transformer import SourceToArgoTransformer
-from scargo.transpile.types import Transput
+from scargo.transpile.types import Context, Transput
 
 
 class WorkflowStep:
@@ -27,9 +27,7 @@ class WorkflowStep:
         self,
         call_node: ast.Call,
         tree: ast.Module,
-        locals_context: Dict[str, Any],
-        context_inputs,
-        context_outputs,
+        context: Context,
         condition: Optional[str] = None,
     ) -> None:
         """
@@ -49,9 +47,7 @@ class WorkflowStep:
             The entire (!) Abstract Syntax Tree of the Python scargo script.
         """
         self.call_node = call_node
-        self.locals_context = locals_context
-        self.context_inputs = context_inputs
-        self.context_outputs = context_outputs
+        self.context = context
         # TODO: the context extracted from the tree should be passed as an argument, instead of processed in this class
         self.tree = tree
         self.condition = condition
@@ -141,9 +137,9 @@ class WorkflowStep:
         input_node = utils.get_variable_from_args_or_kwargs(self.call_node, "scargo_in", 0)
 
         if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
-            scargo_input = utils.resolve_transput(input_node, self.locals_context, self.tree)
-        elif isinstance(input_node, ast.Name) and isinstance(self.context_inputs[input_node.id], Transput):
-            scargo_input = self.context_inputs[input_node.id]
+            scargo_input = utils.resolve_transput(input_node, self.context, self.tree)
+        elif isinstance(input_node, ast.Name) and isinstance(self.context.inputs[input_node.id], Transput):
+            scargo_input = self.context.inputs[input_node.id]
         else:
             raise ScargoTranspilerError(
                 "Unexpected input type. First argument to a @scargo function must be a `ScargoInput`."
@@ -160,9 +156,9 @@ class WorkflowStep:
         """
         output_node = utils.get_variable_from_args_or_kwargs(self.call_node, "scargo_out", 1)
         if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
-            scargo_output = utils.resolve_transput(output_node, self.locals_context, self.tree)
-        elif isinstance(output_node, ast.Name) and isinstance(self.context_outputs[output_node.id], Transput):
-            scargo_output = self.context_outputs[output_node.id]
+            scargo_output = utils.resolve_transput(output_node, self.context, self.tree)
+        elif isinstance(output_node, ast.Name) and isinstance(self.context.outputs[output_node.id], Transput):
+            scargo_output = self.context.outputs[output_node.id]
         else:
             raise ScargoTranspilerError(
                 "Unexpected input type. Second argument to a @scargo function must be a `ScargoOutput`."
