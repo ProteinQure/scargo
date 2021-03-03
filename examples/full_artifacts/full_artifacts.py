@@ -6,21 +6,21 @@
 Contrived example used to demonstrate full use of inputs/outputs, as well as parameters/artifacts.
 """
 from scargo.decorators import scargo, entrypoint
-from scargo.args import FileInput, FileOutput, ScargoInput, ScargoOutput
+from scargo.args import FileInput, FileOutput, ScargoInput, ScargoOutput, TmpTransput
 from scargo.core import WorkflowParams, MountPoint, MountPoints
 from scargo.paths import env_local_mountpoint
 
 
 @scargo(image="proteinqure/scargo")
 def get_nth_word(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
-    with scargo_in.artifacts["csv-file"].open() as fi:
+    with scargo_in.artifacts["csv-file"].open(mode="r") as fi:
         words = fi.readline().split(",")
 
-    word = words[int(scargo_in.parameters["word-index"])]
+    word = words[int(scargo_in.parameters["word-index"])].strip()
 
     scargo_out.parameters["out-val"] = word
 
-    with scargo_out.artifacts["out-file"].open() as fi:
+    with scargo_out.artifacts["out-file"].open("w+") as fi:
         fi.write(f"{scargo_in.parameters['pre-word']},{word},{scargo_in.parameters['post-word']}")
 
 
@@ -29,20 +29,22 @@ def add_multi_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends to the character "a" to the "value" in `scargo_in`.
     """
-    result = str(scargo_in.parameters["init-value"]) + "a"
-    with scargo_out.artifacts["txt-out"].open(f"add_multi_{scargo_in.parameters['init-value']}.txt") as fi:
-        fi.write(result)
+    with scargo_in.artifacts["init-file"].open("r") as fi:
+        prev_line = fi.readline()
+
+    alphas = int(scargo_in.parameters["num-alphas"]) * "a"
+    new_word = alphas + str(scargo_in.parameters["init-value"]) + alphas
+
+    with scargo_out.artifacts["txt-out"].open(f"add_multi_{scargo_in.parameters['init-value']}.txt", "w+") as fi:
+        fi.write(f"{prev_line}\n")
+        fi.write(f"{workflow_parameters['pre-word']},{new_word},{workflow_parameters['post-word']}\n")
 
 
 @entrypoint
 def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None:
     nth_word_out = ScargoOutput(
-        parameters={"out-value": None},
-        artifacts={
-            "out-file": FileOutput(
-                root=mount_points["root"], path=workflow_parameters["output-path"], name="out-file.txt"
-            )
-        },
+        parameters={"out-val": None},
+        artifacts={"out-file": TmpTransput("out-file.txt")},
     )
     get_nth_word(
         ScargoInput(
@@ -64,16 +66,10 @@ def main(mount_points: MountPoints, workflow_parameters: WorkflowParams) -> None
     add_multi_alpha(
         ScargoInput(
             parameters={
-                "init-value": nth_word_out.parameters["out-value"],
+                "init-value": nth_word_out.parameters["out-val"],
                 "num-alphas": workflow_parameters["num-alphas"],
             },
-            artifacts={
-                "init-file": FileInput(
-                    root=mount_points["root"],
-                    path=nth_word_out.artifacts["out-file"].path,
-                    name=nth_word_out.artifacts["out-file"].name,
-                )
-            },
+            artifacts={"init-file": nth_word_out.artifacts["out-file"]},
         ),
         ScargoOutput(
             artifacts={"txt-out": FileOutput(root=mount_points["root"], path=workflow_parameters["output-path"])}
@@ -97,7 +93,7 @@ mount_points = MountPoints(
     {
         "root": MountPoint(
             local=env_local_mountpoint(),
-            remote=f"s3://{workflow_parameters['s3-bucket']}",
+            remote=workflow_parameters["s3-bucket"],
         )
     }
 )

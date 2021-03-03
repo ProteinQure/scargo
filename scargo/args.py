@@ -1,5 +1,10 @@
+from dataclasses import dataclass
+from datetime import date
 from io import TextIOWrapper
-from typing import Dict, NamedTuple, Optional
+from pathlib import Path
+import tempfile
+from typing import Any, Dict, Literal, NamedTuple, Optional
+
 from scargo.core import MountPoint
 
 
@@ -12,12 +17,15 @@ class FileInput(NamedTuple):
     path: str
     name: str
 
-    def open(self) -> TextIOWrapper:
+    def open(self, mode="r") -> TextIOWrapper:
         """
         Opens file for reading.
 
         Exists to enable Python functions with I/O to be tested locally while also being transpiled to Argo YAML.
         """
+        if mode != "r":
+            raise ValueError("Can only read from FileInput. Did you think this was a FileOutput or TmpTransput?")
+
         return open(self.root.local / self.path / self.name, "r")
 
     def bash_str(self) -> str:
@@ -25,6 +33,42 @@ class FileInput(NamedTuple):
         String representation for filling bash templates.
         """
         return str(self.root.local / self.path / self.name)
+
+
+@dataclass(frozen=True)
+class TmpTransput:
+    """
+    Wrapper around Python file interface used for temporary file I/O.
+
+    In Argo, this is transpiled to an output destined for the default AWS S3 bucket. In PQ Argo configuration, the
+    default S3 bucket is pq-dataxfer-tmp. This periodically cleared bucket is used as a kind of temporary storage for
+    data-transfer between Argo steps. Thus,  TmpTransput represents this temporary storage for Python and enables
+    transpilation to Argo YAML.
+    """
+
+    name: str
+    tmp_dir: Path = Path(tempfile.gettempdir()) / date.today().isoformat()
+
+    def __post_init__(self):
+        self.tmp_dir.mkdir(exist_ok=True)
+
+    def open(self, mode: Literal["w+", "r"]) -> TextIOWrapper:
+        file_path = self.tmp_dir / self.name
+        if mode == "w+":
+            return open(file_path, mode)
+        elif mode == "r":
+            if not file_path.exists():
+                raise IOError("No file found. Are you trying to read from the TmpTransput before it's been written to?")
+            else:
+                return open(file_path, mode)
+        else:
+            raise ValueError("Unsupported file I/O mode.")
+
+    def bash_str(self) -> str:
+        """
+        String representation for filling bash templates.
+        """
+        return str(self.tmp_dir / self.name)
 
 
 class FileOutput(NamedTuple):
@@ -36,7 +80,7 @@ class FileOutput(NamedTuple):
     path: str
     name: Optional[str] = None
 
-    def open(self, file_name: Optional[str] = None) -> TextIOWrapper:
+    def open(self, file_name: Optional[str] = None, mode="w+") -> TextIOWrapper:
         """
         Opens file for writing.
 
@@ -44,6 +88,9 @@ class FileOutput(NamedTuple):
 
         Exists to enable Python functions with I/O to be tested locally while also being transpiled to Argo YAML.
         """
+        if mode != "w+":
+            raise ValueError("Can only write from FileOutput. Did you think this was a FileInput or TmpTransput?")
+
         output_dir = self.root.local / self.path
 
         if self.name is None:
@@ -78,7 +125,7 @@ class ScargoInput(NamedTuple):
     """
 
     parameters: Optional[Dict] = None
-    artifacts: Optional[Dict[str, FileInput]] = None
+    artifacts: Optional[Dict[str, Any]] = None
 
 
 class ScargoOutput(NamedTuple):
@@ -90,4 +137,4 @@ class ScargoOutput(NamedTuple):
     """
 
     parameters: Optional[Dict] = None
-    artifacts: Optional[Dict[str, FileOutput]] = None
+    artifacts: Optional[Dict[str, Any]] = None

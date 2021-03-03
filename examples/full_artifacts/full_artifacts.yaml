@@ -80,7 +80,7 @@ spec:
           with open("{{inputs.artifacts.csv-file.path}}", "r") as fi:
               words = fi.readline().split(",")
 
-          word = words[int({{inputs.parameters.word-index}})]
+          word = words[int({{inputs.parameters.word-index}})].strip()
 
           with open("{{outputs.parameters.out-val.path}}", "w+") as fi:
               fi.write(word)
@@ -136,9 +136,9 @@ spec:
           alphas = {{inputs.parameters.num-alphas}} * "a"
           new_word = alphas + "{{inputs.parameters.init-value}}" + alphas
 
-          with open("{{outputs.artifacts.txt-out.path}}/full_artifacts_{{inputs.parameters.init-value}}.txt", "w+") as fi:
-              fi.write(prev_line)
-              fi.write(f"{{workflow.parameters.pre-word}},{new_word},{{workflow.parameters.post-word}}")
+          with open("{{outputs.artifacts.txt-out.path}}/add_multi_{{inputs.parameters.init-value}}.txt", "w+") as fi:
+              fi.write(f"{prev_line}\n")
+              fi.write(f"{{workflow.parameters.pre-word}},{new_word},{{workflow.parameters.post-word}}\n")
 
         resources:
           requests:
