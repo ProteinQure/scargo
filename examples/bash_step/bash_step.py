@@ -47,7 +47,7 @@ mount_points = MountPoints(
     {
         "root": MountPoint(
             local=env_local_mountpoint(),
-            remote=f"s3://{workflow_parameters['s3-bucket']}",
+            remote=workflow_parameters["s3-bucket"],
         )
     }
 )
