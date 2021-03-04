@@ -3,6 +3,9 @@ import ast
 from typing import Optional, Union
 
 
+from scargo.errors import ScargoTranspilerError
+
+
 class SourceToArgoTransformer(ast.NodeTransformer):
     """
     Transforms the source code of a @scargo decorated function to be compatible
@@ -54,19 +57,23 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         """
         node_attr = node.value
         if not isinstance(node_attr, ast.Attribute):
-            raise NotImplementedError("Expected Attribute value for this node.")
+            # raise NotImplementedError("Expected Attribute value for this node.")
+            return None
 
         attr_name = node_attr.value
         if not isinstance(attr_name, ast.Name):
-            raise NotImplementedError("Expected Attribute to have name.")
+            # raise NotImplementedError("Expected Attribute to have name.")
+            return None
 
         node_slice = node.slice
         if not isinstance(node_slice, ast.Index):
-            raise NotImplementedError("Expected slice to have an index.")
+            # raise NotImplementedError("Expected slice to have an index.")
+            return None
 
         node_slice_val = node_slice.value
         if not isinstance(node_slice_val, ast.Constant):
-            raise NotImplementedError("Expected slice value to be constant.")
+            # raise NotImplementedError("Expected slice value to be constant.")
+            return None
 
         if attr_name.id == input_arg and node_attr.attr == "parameters":
             return "{{" + f"inputs.{node_attr.attr}.{node_slice_val.value}" + "}}"
@@ -98,6 +105,58 @@ class SourceToArgoTransformer(ast.NodeTransformer):
 
         return "".join(string_parts)
 
+    @staticmethod
+    def _resolve_open(node: ast.Call):
+        """
+        # Convert the `open` method of either FileInput or FileOutput into an ast.Constant
+        """
+        assert isinstance(node.func, ast.Attribute)
+        assert isinstance(node.func.value, ast.Constant)
+
+        # determine if it's read or write mode
+        # these are the same modes as the ones used in the `open` methods
+        # of `FileInput` and `FileOutput`
+        if "inputs" in node.func.value.value:
+            mode = "r"
+        elif "outputs" in node.func.value.value:
+            mode = "w+"
+        else:
+            raise NotImplementedError("Invalid output mode.")
+
+        # get the prefix from the object whose `open` method is being called
+        path_prefix = node.func.value.value
+
+        # get the second part of the path + filename
+        if len(node.args) == 0:
+            full_path = path_prefix
+
+        elif len(node.args) <= 2:
+            raw_path = node.args[0]
+            if isinstance(raw_path, ast.Constant):
+                path = raw_path.value
+            elif isinstance(raw_path, ast.JoinedStr):
+                path = SourceToArgoTransformer._resolve_string(raw_path)
+            else:
+                raise NotImplementedError("Unknown path type.")
+
+            full_path = f"{path_prefix}/{path}"
+
+            if len(node.args) == 2:
+                node_mode = node.args[1]
+                assert isinstance(node_mode, ast.Constant)
+                assert mode == node_mode.value
+        else:
+            raise ScargoTranspilerError("Only ScargoInput and ScargoOutput work.")
+
+        return ast.Call(
+            func=ast.Name(id="open", ctx=ast.Load()),
+            args=[
+                ast.Constant(value=full_path, kind=None),
+                ast.Constant(value=mode, kind=None),
+            ],
+            keywords=[],
+        )
+
     def visit_Call(self, node: ast.Call) -> ast.Call:
         """
         Custom visitor method for ast.Call nodes.
@@ -118,38 +177,6 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         self.generic_visit(node)
 
         if isinstance(node.func, ast.Attribute) and node.func.attr == "open":
-            # then we know that we're dealing with the `open` method of either
-            # FileInput or FileOutput
-
-            # determine if it's read or write mode
-            # these are the same modes as the ones used in the `open` methods
-            # of `FileInput` and `FileOutput`
-            if "inputs" in node.func.value.value:
-                mode = "r"
-            elif "outputs" in node.func.value.value:
-                mode = "w+"
-            else:
-                raise NotImplementedError("Invalid output mode.")
-
-            # get the prefix from the object whose `open` method is being called
-            path_prefix = node.func.value.value
-
-            # get the second part of the path + filename
-            raw_path = node.args[0]
-            if isinstance(raw_path, ast.Constant):
-                path = raw_path.value
-            elif isinstance(raw_path, ast.JoinedStr):
-                path = self._resolve_string(raw_path)
-            else:
-                raise NotImplementedError("Unknown path type.")
-
-            return ast.Call(
-                func=ast.Name(id="open", ctx=ast.Load()),
-                args=[
-                    ast.Constant(value=f"{path_prefix}/{path}", kind=None),
-                    ast.Constant(value=mode, kind=None),
-                ],
-                keywords=[],
-            )
+            return SourceToArgoTransformer._resolve_open(node)
         else:
             return node

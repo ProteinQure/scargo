@@ -179,9 +179,8 @@ class WorkflowStep:
         if self.inputs.parameters is not None:
             inputs_section["inputs"]["parameters"] = [{"name": key} for key in self.inputs.parameters]
         if self.inputs.artifacts is not None:
-            # TODO: that's not how an input artifact works
             inputs_section["inputs"]["artifacts"] = [
-                dict({"name": name, "path": f"/workdir/in/{file_input.name}"})
+                dict({"name": name, "from": f"/workdir/in/{file_input.path}"})
                 for name, file_input in self.inputs.artifacts.items()
             ]
         template.update(inputs_section)
