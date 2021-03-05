@@ -12,25 +12,25 @@ spec:
       - name: input-val
       - name: s3-bucket
       - name: output-path
-      - name: optimized
 
   entrypoint: main
 
   templates:
     - name: main
       steps:
-        - - name: add-alpha-compute
+        - - name: add-alpha
             template: exec-add-alpha
             arguments:
               parameters:
                 - name: init-value
                   value: "{{workflow.parameters.input-val}}"
-        - - name: add-beta-compute
+
+        - - name: add-beta
             template: exec-add-beta
             arguments:
               parameters:
                 - name: init-value
-                  value: "{{steps.add-alpha-compute.outputs.parameters.out-val}}"
+                  value: "{{steps.exec-add-alpha.outputs.parameters.out-value}}"
 
     - name: exec-add-alpha
       inputs:
@@ -38,7 +38,7 @@ spec:
           - name: init-value
       outputs:
         parameters:
-          - name: out-val
+          - name: out-value
             valueFrom:
               path: /workdir/out/add_alpha.txt
       initContainers:
@@ -54,7 +54,7 @@ spec:
         image: python:alpine
         command: [python]
         source: |
-          with open("{{outputs.parameters.out-val.path}}", "w+") as fi:
+          with open("{{outputs.parameters.out-value.path}}", "w+") as fi:
               fi.write(str({{inputs.parameters.init-value}}) + "a")
 
         resources:

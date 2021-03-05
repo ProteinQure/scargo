@@ -1,7 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
+
 kind: Workflow
+
 metadata:
-  generateName: scargo-multi-step-cond-
+  generateName: scargo-multi-step-with-cond-
+
 spec:
   volumes:
     - name: workdir
@@ -13,21 +16,20 @@ spec:
       - name: input-type
       - name: s3-bucket
       - name: output-path
-      - name: optimized
 
   entrypoint: main
 
   templates:
     - name: main
       steps:
-        - - name: add-alpha-compute
+        - - name: add-alpha
             template: exec-add-alpha
             arguments:
               parameters:
                 - name: init-value
                   value: "{{workflow.parameters.input-val}}"
             when: "{{workflow.parameters.input-type}} == alpha"
-          - name: add-beta-compute
+          - name: add-beta
             template: exec-add-beta
             arguments:
               parameters:
@@ -52,7 +54,7 @@ spec:
       initContainers:
         - name: mkdir
           image: alpine:latest
-          command: ["mkdir", "-p", "/workdir/out", "/workdir/in"]
+          command: ["mkdir", "-p", "/workdir/out"]
           mirrorVolumeMounts: true
         - name: chmod
           image: alpine:latest
@@ -62,8 +64,9 @@ spec:
         image: python:alpine
         command: [python]
         source: |
+          result = str('{{inputs.parameters.init-value}}') + 'a'
           with open("{{outputs.artifacts.txt-out.path}}/add_alpha_{{inputs.parameters.init-value}}.txt", "w+") as fi:
-              fi.write("{{inputs.parameters.init-value}})" + "a")
+              fi.write(result)
 
         resources:
           requests:
@@ -93,7 +96,7 @@ spec:
       initContainers:
         - name: mkdir
           image: alpine:latest
-          command: ["mkdir", "-p", "/workdir/out", "/workdir/in"]
+          command: ["mkdir", "-p", "/workdir/out"]
           mirrorVolumeMounts: true
         - name: chmod
           image: alpine:latest
@@ -103,8 +106,9 @@ spec:
         image: python:alpine
         command: [python]
         source: |
+          result = "{{inputs.parameters.init-value}})" + "b"
           with open("{{outputs.artifacts.txt-out.path}}/add_beta_{{inputs.parameters.init-value}}.txt", "w+") as fi:
-              fi.write("{{inputs.parameters.init-value}})" + "b")
+              fi.write(result)
 
         resources:
           requests:

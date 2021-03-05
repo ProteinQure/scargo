@@ -12,14 +12,13 @@ spec:
       - name: input-val
       - name: s3-bucket
       - name: output-path
-      - name: optimized
 
   entrypoint: main
 
   templates:
     - name: main
       steps:
-        - - name: add-alpha-compute
+        - - name: add-alpha
             template: exec-add-alpha
             arguments:
               parameters:

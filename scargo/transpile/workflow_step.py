@@ -31,7 +31,7 @@ class WorkflowStep(NamedTuple):
         """
         Returns the template name of the workflow step.
         """
-        return f"{self.hyphenated_name}-template"
+        return f"exec-{self.hyphenated_name}"
 
 
 def get_functiondef_node(name: str, tree: ast.Module) -> Optional[ast.FunctionDef]:

@@ -56,7 +56,7 @@ def build_step_template(step: WorkflowStep, all_outputs: Dict[str, str]) -> Dict
                 {
                     "name": name,
                     "value": "{{"
-                    + f"steps.{all_outputs[prev_step_param]}-compute.outputs.parameters.{prev_step_param}"
+                    + f"steps.exec-{all_outputs[prev_step_param]}.outputs.parameters.{prev_step_param}"
                     + "}}",
                 }
             )

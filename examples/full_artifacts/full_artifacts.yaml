@@ -9,7 +9,7 @@ spec:
 
   arguments:
     parameters:
-      - name: input-val
+      - name: word-index
       - name: pre-word
       - name: post-word
       - name: num-alphas
@@ -17,7 +17,6 @@ spec:
       - name: input-path
       - name: input-csv
       - name: output-path
-      - name: optimized
 
   entrypoint: main
 
@@ -29,7 +28,7 @@ spec:
             arguments:
               parameters:
                 - name: word-index
-                  value: "{{workflow.parameters.input-val}}"
+                  value: "{{workflow.parameters.word-index}}"
               artifacts:
                 - name: csv-file
                   s3:
