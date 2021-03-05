@@ -11,7 +11,7 @@ from scargo.core import WorkflowParams, MountPoint, MountPoints
 from scargo.paths import env_local_mountpoint
 
 
-@scargo(image="proteinqure/scargo")
+@scargo(image="python:alpine")
 def get_nth_word(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     with scargo_in.artifacts["csv-file"].open(mode="r") as fi:
         words = fi.readline().split(",")
@@ -24,7 +24,7 @@ def get_nth_word(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
         fi.write(f"{scargo_in.parameters['pre-word']},{word},{scargo_in.parameters['post-word']}")
 
 
-@scargo(image="proteinqure/scargo")
+@scargo(image="python:alpine")
 def add_multi_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends to the character "a" to the "value" in `scargo_in`.

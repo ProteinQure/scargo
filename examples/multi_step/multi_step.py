@@ -8,7 +8,7 @@ from scargo.core import WorkflowParams, MountPoint, MountPoints
 from scargo.paths import env_local_mountpoint
 
 
-@scargo(image="proteinqure/scargo")
+@scargo(image="python:alpine")
 def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends to the character "a" to the "value" in `scargo_in`.
@@ -16,7 +16,7 @@ def add_alpha(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     scargo_out.parameters["out-value"] = str(scargo_in.parameters["init-value"]) + "a"
 
 
-@scargo(image="proteinqure/scargo")
+@scargo(image="python:alpine")
 def add_beta(scargo_in: ScargoInput, scargo_out: ScargoOutput) -> None:
     """
     Appends the character "b" to the "value" in `scargo_in`.
