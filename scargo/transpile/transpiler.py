@@ -4,13 +4,13 @@ Core functionality of the Python -> Argo YAML transpiler.
 
 import ast
 from pathlib import Path
-from scargo.transpile.types import Transput
 from typing import Any, Dict, List, Union
 
 import astpretty
 
 from scargo.core import WorkflowParams
-from scargo.transpile.workflow_step import WorkflowStep
+from scargo.transpile.workflow_step import generate_template, WorkflowStep
+from scargo.transpile.types import Transput
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import entrypoint, yaml_io
 
@@ -131,7 +131,7 @@ def build_template(
     # add template implementations for the individual workflow steps
     for step_group in workflow_steps:
         for step in step_group:
-            templates.append(step.template)
+            templates.append(generate_template(step))
 
     # all templates, including the entrypoint, it's corresponding steps and step-implementation templates fall under the
     # spec -> templates fields of an Argo Workflow

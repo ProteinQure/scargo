@@ -6,7 +6,7 @@ import astor
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile.types import Context
 from scargo.transpile import utils
-from scargo.transpile.workflow_step import WorkflowStep
+from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
 
 class EntrypointTranspiler(ast.NodeVisitor):
@@ -27,7 +27,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
         # TODO: easier to read if transput were resolved and passed
         self.steps.append(
             [
-                WorkflowStep(
+                make_workflow_step(
                     call_node=node,
                     context=self.context,
                     tree=self.tree,
@@ -119,7 +119,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
         body = node.body[0]
         if isinstance(body, ast.Expr) and isinstance(body.value, ast.Call):
             condition = self._resolve_cond(node)
-            return WorkflowStep(
+            return make_workflow_step(
                 call_node=body.value,
                 tree=self.tree,
                 context=self.context,

@@ -1,6 +1,6 @@
 import ast
 import copy
-from typing import Any, Dict, Optional
+from typing import Any, Dict, NamedTuple, Optional
 
 import astor
 
@@ -10,54 +10,14 @@ from scargo.transpile.transformer import SourceToArgoTransformer
 from scargo.transpile.types import Context, FilePut, FileTmp, Transput
 
 
-class WorkflowStep:
-    """
-    A single step/template in the workflow.
-
-    Transforms @scargo functions into Argo-compatible workflow functions.
-
-    Specifically, transpile.build_template() uses the properties:
-     - `.inputs` and others to provide the Argo template definition
-     - `.template` to provide the Argo template implementation
-
-     # TODO: made this class immutable
-    """
-
-    def __init__(
-        self,
-        call_node: ast.Call,
-        tree: ast.Module,
-        context: Context,
-        condition: Optional[str] = None,
-    ) -> None:
-        """
-        Create a new WorkflowStep.
-
-        Parameters
-        ----------
-        call_node : ast.Call
-            The Call node that invokes this workflow step. In other words the
-            Call node which calls the @scargo decorated function in the
-            @entrypoint function.
-        locals_context : Dict
-            The locals() context resulting from `exec`uting the Python scargo
-            script. Should contain all the global imports, variables and
-            function definitions.
-        tree : ast.Module
-            The entire (!) Abstract Syntax Tree of the Python scargo script.
-        """
-        self.call_node = call_node
-        self.context = context
-        # TODO: the context extracted from the tree should be passed as an argument, instead of processed in this class
-        self.tree = tree
-        self.condition = condition
-
-    @property
-    def name(self) -> str:
-        """
-        Returns the name of the workflow step.
-        """
-        return self.call_node.func.id
+class WorkflowStep(NamedTuple):
+    call_node: ast.Call
+    name: str
+    image: str
+    inputs: Transput
+    outputs: Transput
+    functiondef_node: ast.FunctionDef
+    condition: Optional[str] = None
 
     @property
     def hyphenated_name(self) -> str:
@@ -73,187 +33,203 @@ class WorkflowStep:
         """
         return f"{self.hyphenated_name}-template"
 
-    @property
-    def image(self) -> str:
-        """
-        Returns the Docker image that this workflow step is supposed to be
-        executed in.
-        """
-        scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", self.functiondef_node.decorator_list))[0]
-        assert isinstance(scargo_decorator_node, ast.Call)
-        return utils.get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
 
-    @property
-    def functiondef_node(self) -> Optional[ast.FunctionDef]:
-        """
-        Returns the FunctionDef node which represents the definition of the
-        Python function corresponding to this workflow step.
-        """
-        for toplevel_node in ast.iter_child_nodes(self.tree):
-            if isinstance(toplevel_node, ast.FunctionDef) and toplevel_node.name == self.name:
-                return toplevel_node
+def get_functiondef_node(name: str, tree: ast.Module) -> Optional[ast.FunctionDef]:
+    """
+    Returns the FunctionDef node which represents the definition of the
+    Python function corresponding to this workflow step.
+    """
+    for toplevel_node in ast.iter_child_nodes(tree):
+        if isinstance(toplevel_node, ast.FunctionDef) and toplevel_node.name == name:
+            return toplevel_node
 
-    @property
-    def source_code(self) -> Optional[str]:
-        """
-        Returns the source code for this workflow step.
-        """
 
-        if self.functiondef_node is None:
-            return None
+def get_inputs(call_node: ast.Call, context: Context, tree: ast.Module) -> Transput:
+    """
+    Parses the input parameters and artifacts from the workflow step and
+    returns them as a Transput object (which has a `parameters` and an
+    `artifacts` attribute for easy access.
 
-        # Get the names of the ScargoInput/ScargoOutput arguments.
-        # In the docs, it is required the first argument to be ScargoInput and the
-        # second to be ScargoOutput
-        # TODO: check argument types, instead of assuming
-        # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/19
-        input_arg_name = self.functiondef_node.args.args[0].arg
-        output_arg_name = self.functiondef_node.args.args[1].arg
+    TODO: inputs and outputs use similar logic
+    """
+    input_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_in", 0)
 
-        # Resolves f-strings with WorkflowParams/MountPoints
-        converted_functiondef = SourceToArgoTransformer(
-            input_arg_name, self.inputs, output_arg_name, self.outputs
-        ).visit(copy.deepcopy(self.functiondef_node))
-
-        # TODO: format the output source with black
-        # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/20
-        source = []
-        for node in converted_functiondef.body:
-            if not isinstance(node, ast.Expr):  # if it's not a docstring
-                source.append(astor.to_source(node))
-
-        return "".join(source)
-
-    @property
-    def inputs(self) -> Transput:
-        """
-        Parses the input parameters and artifacts from the workflow step and
-        returns them as a Transput object (which has a `parameters` and an
-        `artifacts` attribute for easy access.
-
-        TODO: inputs and outputs use similar logic
-        TODO: do this on initialization instead of when called
-        """
-        input_node = utils.get_variable_from_args_or_kwargs(self.call_node, "scargo_in", 0)
-
-        if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
-            scargo_input = utils.resolve_transput(input_node, self.context, self.tree)
-        elif isinstance(input_node, ast.Name) and isinstance(self.context.inputs[input_node.id], Transput):
-            scargo_input = self.context.inputs[input_node.id]
-        else:
-            raise ScargoTranspilerError(
-                "Unexpected input type. First argument to a @scargo function must be a `ScargoInput`."
-            )
-
-        return scargo_input
-
-    @property
-    def outputs(self) -> Transput:
-        """
-        Parses the input parameters and artifacts from the workflow step and
-        returns them as a Transput object (which has a `parameters` and an
-        `artifacts` attribute for easy access.
-        """
-        output_node = utils.get_variable_from_args_or_kwargs(self.call_node, "scargo_out", 1)
-        if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
-            scargo_output = utils.resolve_transput(output_node, self.context, self.tree)
-        elif isinstance(output_node, ast.Name) and isinstance(self.context.outputs[output_node.id], Transput):
-            scargo_output = self.context.outputs[output_node.id]
-        else:
-            raise ScargoTranspilerError(
-                "Unexpected input type. Second argument to a @scargo function must be a `ScargoOutput`."
-            )
-
-        return scargo_output
-
-    @property
-    def template(self) -> Dict[str, Any]:
-        """
-        Returns the dictionary defining the Argo template for this workflow
-        step.
-        """
-
-        template: Dict[str, Any] = {"name": self.template_name}
-
-        inputs_section = {"inputs": dict()}
-        if self.inputs.parameters is not None:
-            inputs_section["inputs"]["parameters"] = [{"name": key} for key in self.inputs.parameters]
-        if self.inputs.artifacts is not None:
-            inputs_section["inputs"]["artifacts"] = [
-                dict({"name": name, "from": f"/workdir/in/{file_input.path}"})
-                for name, file_input in self.inputs.artifacts.items()
-            ]
-        template.update(inputs_section)
-
-        outputs_section = {"outputs": dict()}
-        if self.outputs.parameters is not None:
-            outputs_section["outputs"]["parameters"] = [{"name": key} for key in self.outputs.parameters]
-        if self.outputs.artifacts is not None:
-            artifacts = []
-            for name, file_output in self.outputs.artifacts.items():
-                if isinstance(file_output, FilePut):
-                    artifacts.append(
-                        dict(
-                            {
-                                "name": name,
-                                "path": "/workdir/out",
-                                "s3": {
-                                    "endpoint": "s3.amazonaws.com",
-                                    "bucket": file_output.root,
-                                    "key": file_output.path,
-                                },
-                            }
-                        )
-                    )
-                elif isinstance(file_output, FileTmp):
-                    artifacts.append(
-                        dict(
-                            {
-                                "name": name,
-                                "path": f"/workdir/out/{file_output.path}",
-                            }
-                        )
-                    )
-                else:
-                    raise ScargoTranspilerError("Only FilPut and FileTmp supported.")
-
-            outputs_section["outputs"]["artifacts"] = artifacts
-
-        template.update(outputs_section)
-
-        template.update(
-            {
-                "initContainers": [
-                    {
-                        "name": "mkdir",
-                        "image": "alpine:latest",
-                        "command": ["mkdir", "-p", "/workdir/out"],
-                        "mirrorVolumeMounts": True,
-                    },
-                    {
-                        "name": "chmod",
-                        "image": "alpine:latest",
-                        "command": ["chmod", "-R", "a+rwX", "/workdir"],
-                        "mirrorVolumeMounts": True,
-                    },
-                ],
-                "script": {
-                    "image": self.image,
-                    "command": ["python"],  # TODO: needs to be dynamic
-                    "source": self.source_code,
-                    "resources": {
-                        "requests": {
-                            "memory": "30Mi",
-                            "cpu": "20m",
-                        },
-                        "limits": {
-                            "memory": "30Mi",
-                            "cpu": "20m",
-                        },
-                    },
-                    "volumeMounts": [{"name": "workdir", "mountPath": "/workdir"}],  # TODO: only include if needed
-                },
-            }
+    if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
+        scargo_input = utils.resolve_transput(input_node, context, tree)
+    elif isinstance(input_node, ast.Name) and isinstance(context.inputs[input_node.id], Transput):
+        scargo_input = context.inputs[input_node.id]
+    else:
+        raise ScargoTranspilerError(
+            "Unexpected input type. First argument to a @scargo function must be a `ScargoInput`."
         )
 
-        return template
+    return scargo_input
+
+
+def get_outputs(call_node: ast.Call, context: Context, tree: ast.Module) -> Transput:
+    """
+    Parses the input parameters and artifacts from the workflow step and
+    returns them as a Transput object (which has a `parameters` and an
+    `artifacts` attribute for easy access.
+    """
+    output_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_out", 1)
+    if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
+        scargo_output = utils.resolve_transput(output_node, context, tree)
+    elif isinstance(output_node, ast.Name) and isinstance(context.outputs[output_node.id], Transput):
+        scargo_output = context.outputs[output_node.id]
+    else:
+        raise ScargoTranspilerError(
+            "Unexpected input type. Second argument to a @scargo function must be a `ScargoOutput`."
+        )
+
+    return scargo_output
+
+
+def get_image(functiondef_node: ast.FunctionDef) -> str:
+    scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", functiondef_node.decorator_list))[0]
+    assert isinstance(scargo_decorator_node, ast.Call)
+    return utils.get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
+
+
+def make_workflow_step(
+    call_node: ast.Call,
+    tree: ast.Module,
+    context: Context,
+    condition: Optional[str] = None,
+) -> WorkflowStep:
+
+    name = call_node.func.id
+    functiondef_node = get_functiondef_node(name, tree)
+    if functiondef_node is None:
+        raise ScargoTranspilerError(f"No function definition found for name: {name}")
+
+    return WorkflowStep(
+        call_node=call_node,
+        name=name,
+        image=get_image(functiondef_node),
+        inputs=get_inputs(call_node, context, tree),
+        outputs=get_outputs(call_node, context, tree),
+        functiondef_node=functiondef_node,
+        condition=condition,
+    )
+
+
+def source_code(step: WorkflowStep) -> Optional[str]:
+    """
+    Returns the source code for this workflow step.
+    """
+
+    # Get the names of the ScargoInput/ScargoOutput arguments.
+    # In the docs, it is required the first argument to be ScargoInput and the
+    # second to be ScargoOutput
+    # TODO: check argument types, instead of assuming
+    # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/19
+    function_args = step.functiondef_node.args.args
+    input_arg_name = function_args[0].arg
+    output_arg_name = function_args[1].arg
+
+    # Resolves f-strings with WorkflowParams/MountPoints
+    converted_functiondef = SourceToArgoTransformer(input_arg_name, step.inputs, output_arg_name, step.outputs).visit(
+        copy.deepcopy(step.functiondef_node)
+    )
+
+    # TODO: format the output source with black
+    # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/20
+    source = []
+    for node in converted_functiondef.body:
+        if not isinstance(node, ast.Expr):  # if it's not a docstring
+            source.append(astor.to_source(node))
+
+    return "".join(source)
+
+
+def generate_template(step: WorkflowStep) -> Dict[str, Any]:
+    """
+    Returns the dictionary defining the Argo template for this workflow
+    step.
+    """
+
+    template: Dict[str, Any] = {"name": step.template_name}
+
+    inputs_section = {"inputs": dict()}
+    if step.inputs.parameters is not None:
+        inputs_section["inputs"]["parameters"] = [{"name": key} for key in step.inputs.parameters]
+    if step.inputs.artifacts is not None:
+        inputs_section["inputs"]["artifacts"] = [
+            dict({"name": name, "from": f"/workdir/in/{file_input.path}"})
+            for name, file_input in step.inputs.artifacts.items()
+        ]
+    template.update(inputs_section)
+
+    outputs_section = {"outputs": dict()}
+    if step.outputs.parameters is not None:
+        outputs_section["outputs"]["parameters"] = [{"name": key} for key in step.outputs.parameters]
+    if step.outputs.artifacts is not None:
+        artifacts = []
+        for name, file_output in step.outputs.artifacts.items():
+            if isinstance(file_output, FilePut):
+                artifacts.append(
+                    dict(
+                        {
+                            "name": name,
+                            "path": "/workdir/out",
+                            "s3": {
+                                "endpoint": "s3.amazonaws.com",
+                                "bucket": file_output.root,
+                                "key": file_output.path,
+                            },
+                        }
+                    )
+                )
+            elif isinstance(file_output, FileTmp):
+                artifacts.append(
+                    dict(
+                        {
+                            "name": name,
+                            "path": f"/workdir/out/{file_output.path}",
+                        }
+                    )
+                )
+            else:
+                raise ScargoTranspilerError("Only FilPut and FileTmp supported.")
+
+        outputs_section["outputs"]["artifacts"] = artifacts
+
+    template.update(outputs_section)
+
+    template.update(
+        {
+            "initContainers": [
+                {
+                    "name": "mkdir",
+                    "image": "alpine:latest",
+                    "command": ["mkdir", "-p", "/workdir/out"],
+                    "mirrorVolumeMounts": True,
+                },
+                {
+                    "name": "chmod",
+                    "image": "alpine:latest",
+                    "command": ["chmod", "-R", "a+rwX", "/workdir"],
+                    "mirrorVolumeMounts": True,
+                },
+            ],
+            "script": {
+                "image": step.image,
+                "command": ["python"],  # TODO: needs to be dynamic
+                "source": source_code(step),
+                "resources": {
+                    "requests": {
+                        "memory": "30Mi",
+                        "cpu": "20m",
+                    },
+                    "limits": {
+                        "memory": "30Mi",
+                        "cpu": "20m",
+                    },
+                },
+                "volumeMounts": [{"name": "workdir", "mountPath": "/workdir"}],  # TODO: only include if needed
+            },
+        }
+    )
+
+    return template
