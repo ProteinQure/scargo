@@ -4,6 +4,8 @@ from typing import Optional, Union
 
 
 from scargo.errors import ScargoTranspilerError
+from scargo.transpile.types import Artifacts, FilePut, FileTmp, Transput
+from scargo.transpile import utils
 
 
 class SourceToArgoTransformer(ast.NodeTransformer):
@@ -22,7 +24,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
     SourceToArgoTransformer("scargo_in", "scargo_out").visit(tree)
     """
 
-    def __init__(self, input_argument: str, output_argument: str):
+    def __init__(self, input_argument: str, inputs: Transput, output_argument: str, outputs: Transput):
         """
         Create a new SourceToArgoTransformer.
 
@@ -36,7 +38,9 @@ class SourceToArgoTransformer(ast.NodeTransformer):
             function whose node is being transformed.
         """
         self.input_argument = input_argument
+        self.inputs = inputs
         self.output_argument = output_argument
+        self.outputs = outputs
 
     def visit_Subscript(self, node: ast.Subscript) -> Union[ast.Subscript, ast.Constant]:
         """
@@ -106,50 +110,65 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         return "".join(string_parts)
 
     @staticmethod
-    def _resolve_open(node: ast.Call):
+    def _resolve_open(
+        node: ast.Call, inputs: Optional[Artifacts] = None, outputs: Optional[Artifacts] = None
+    ) -> ast.Call:
         """
-        # Convert the `open` method of either FileInput or FileOutput into an ast.Constant
+        Convert the `open` method of either FileInput or FileOutput into an ast.Constant
+
+        Accomplished by:
+        1. Assembling the path to the file from the `open()` method from `FileOutput` or `FileInput`.
+        2. Converting it to the built-in `open()` function with Argo compatible paths.
         """
         assert isinstance(node.func, ast.Attribute)
         assert isinstance(node.func.value, ast.Constant)
 
+        # the full artifact path, for example: {{outputs.artifacts.txt-out.path}}
+        full_path = node.func.value.value
+
         # determine if it's read or write mode
         # these are the same modes as the ones used in the `open` methods
         # of `FileInput` and `FileOutput`
-        if "inputs" in node.func.value.value:
+        if "inputs" in full_path:
             mode = "r"
-        elif "outputs" in node.func.value.value:
+            put_obj = inputs[full_path.split(".")[2]]
+        elif "outputs" in full_path:
             mode = "w+"
+            put_obj = outputs[full_path.split(".")[2]]
         else:
-            raise NotImplementedError("Invalid output mode.")
+            raise ScargoTranspilerError("Unexpected open() target. Expected `inputs` or `outputs`.")
 
-        # get the prefix from the object whose `open` method is being called
-        path_prefix = node.func.value.value
-
-        # get the second part of the path + filename
-        if len(node.args) == 0:
-            full_path = path_prefix
-
-        elif len(node.args) <= 2:
-            raw_path = node.args[0]
-            if isinstance(raw_path, ast.Constant):
-                path = raw_path.value
-            elif isinstance(raw_path, ast.JoinedStr):
-                path = SourceToArgoTransformer._resolve_string(raw_path)
+        if isinstance(put_obj, FilePut):
+            if mode == "r":
+                vars = utils.get_variables_from_call(node, ["mode"])
             else:
-                raise NotImplementedError("Unknown path type.")
+                # get the second part of the path + filename
+                vars = utils.get_variables_from_call(node, ["file_name", "mode"])
 
-            full_path = f"{path_prefix}/{path}"
+                if "file_name" in vars:
+                    raw_path = vars["file_name"]
+                    if isinstance(raw_path, ast.Constant):
+                        path = raw_path.value
+                    elif isinstance(raw_path, ast.JoinedStr):
+                        path = SourceToArgoTransformer._resolve_string(raw_path)
+                    else:
+                        raise NotImplementedError(f"Unknown path type for file_name: {raw_path}")
 
-            if len(node.args) == 2:
-                node_mode = node.args[1]
-                assert isinstance(node_mode, ast.Constant)
-                assert mode == node_mode.value
+                    full_path = f"{full_path}/{path}"
+
+        elif isinstance(put_obj, FileTmp):
+            vars = utils.get_variables_from_call(node, ["mode"])
         else:
-            raise ScargoTranspilerError("Only ScargoInput and ScargoOutput work.")
+            raise ScargoTranspilerError("Unexpected open() target. Expected `inputs` or `outputs`.")
+
+        # Mode sanity check
+        if "mode" in vars:
+            node_mode = vars["mode"]
+            assert isinstance(node_mode, ast.Constant)
+            assert mode == node_mode.value
 
         return ast.Call(
-            func=ast.Name(id="open", ctx=ast.Load()),
+            func=ast.Name(id="open"),
             args=[
                 ast.Constant(value=full_path, kind=None),
                 ast.Constant(value=mode, kind=None),
@@ -165,18 +184,12 @@ class SourceToArgoTransformer(ast.NodeTransformer):
 
         1. Identifying calls to `open()` methods on `FileInput` or `FileOutput` objects.
         2. Modifying the call node in such a way that the file read/write operation works in an Argo workflow.
-
-        Accomplished by:
-
-        1. Assembling the path to the file from the `open()` method from `FileOutput` or `FileInput`.
-        2. Converting it to the built-in `open()` function with Argo compatible paths.
         """
-
         # Visit child nodes to ensure all nested nodes are transformed by the
         # custom `visit_Call` and `visit_Subscript` methods
         self.generic_visit(node)
 
         if isinstance(node.func, ast.Attribute) and node.func.attr == "open":
-            return SourceToArgoTransformer._resolve_open(node)
+            return SourceToArgoTransformer._resolve_open(node, self.inputs.artifacts, self.outputs.artifacts)
         else:
             return node

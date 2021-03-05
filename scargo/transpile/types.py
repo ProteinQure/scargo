@@ -1,9 +1,16 @@
-from typing import Any, Dict, NamedTuple, Optional
+from typing import Any, Dict, NamedTuple, Optional, Union
 
 
 class FilePut(NamedTuple):
     root: str
     path: str
+
+
+class FileTmp(NamedTuple):
+    path: str
+
+
+Artifacts = Dict[str, Union[FilePut, FileTmp]]
 
 
 class Transput(NamedTuple):
@@ -13,7 +20,7 @@ class Transput(NamedTuple):
     """
 
     parameters: Optional[Dict[str, str]] = None
-    artifacts: Optional[Dict[str, FilePut]] = None
+    artifacts: Optional[Artifacts] = None
 
     @property
     def exist(self) -> bool:

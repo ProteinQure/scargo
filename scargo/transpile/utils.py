@@ -2,11 +2,11 @@
 Utility functions used in the transpilation process.
 """
 import ast
-from typing import Any, Dict
+from typing import Any, Dict, List, Union
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.types import Context, Transput, FilePut
+from scargo.transpile.types import Context, Transput, FilePut, FileTmp
 
 
 def hyphenate(text: str) -> str:
@@ -41,6 +41,18 @@ def get_variables_from_args_and_kwargs(node: ast.Call, locals_context: Dict[str,
     klass = locals_context[node.func.id]
     # proceeding assuming the parameters are assigned correctly
     # TODO: actually assign args later, lol
+
+    for keyword in node.keywords:
+        all_vars[keyword.arg] = keyword.value
+
+    return all_vars
+
+
+def get_variables_from_call(node: ast.Call, expected_args: List[str] = None) -> Dict[str, ast.expr]:
+    all_vars = dict()
+
+    for a_i, arg in enumerate(node.args):
+        all_vars[expected_args[a_i]] = arg
 
     for keyword in node.keywords:
         all_vars[keyword.arg] = keyword.value
@@ -138,14 +150,10 @@ def resolve_subscript(node: ast.Subscript, context: Context, tree: ast.Module) -
         raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
 
 
-def resolve_artifact(artifact_node: ast.Call, context: Context, tree: ast.Module) -> FilePut:
+def resolve_artifact(artifact_node: ast.Call, context: Context, tree: ast.Module) -> Union[FilePut, FileTmp]:
     if artifact_node.func.id == "TmpTransput":
-        # TODO: what should the root actually be?
         path = get_variable_from_args_or_kwargs(artifact_node, "name", 0)
-        if isinstance(path, ast.Constant):
-            return FilePut(root="nope", path=path.value)
-        else:
-            return FilePut(root="nope", path=path)
+        return FileTmp(path=path.value)
 
     # TODO: this code will break if a subscript is assigned as a variable and then passed as an argument
     root_node = get_variable_from_args_or_kwargs(artifact_node, "root", 0)

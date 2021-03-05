@@ -158,8 +158,6 @@ def find_entrypoint(tree) -> ast.FunctionDef:
     entrypoints = []
     for top_level_node in tree.body:
         if isinstance(top_level_node, ast.FunctionDef):
-
-            print(astpretty.pprint(top_level_node.decorator_list[0], show_offsets=False))
             if "entrypoint" in get_decorator_names(top_level_node.decorator_list):
                 entrypoints.append(top_level_node)
 

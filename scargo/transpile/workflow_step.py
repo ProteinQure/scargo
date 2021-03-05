@@ -7,7 +7,7 @@ import astor
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import utils
 from scargo.transpile.transformer import SourceToArgoTransformer
-from scargo.transpile.types import Context, Transput
+from scargo.transpile.types import Context, FilePut, FileTmp, Transput
 
 
 class WorkflowStep:
@@ -111,9 +111,9 @@ class WorkflowStep:
         output_arg_name = self.functiondef_node.args.args[1].arg
 
         # Resolves f-strings with WorkflowParams/MountPoints
-        converted_functiondef = SourceToArgoTransformer(input_arg_name, output_arg_name).visit(
-            copy.deepcopy(self.functiondef_node)
-        )
+        converted_functiondef = SourceToArgoTransformer(
+            input_arg_name, self.inputs, output_arg_name, self.outputs
+        ).visit(copy.deepcopy(self.functiondef_node))
 
         # TODO: format the output source with black
         # https://gitlab.proteinqure.com/pq/platform/core/scargo/-/issues/20
@@ -189,20 +189,36 @@ class WorkflowStep:
         if self.outputs.parameters is not None:
             outputs_section["outputs"]["parameters"] = [{"name": key} for key in self.outputs.parameters]
         if self.outputs.artifacts is not None:
-            outputs_section["outputs"]["artifacts"] = [
-                dict(
-                    {
-                        "name": name,
-                        "path": "/workdir/out",
-                        "s3": {
-                            "endpoint": "s3.amazonaws.com",
-                            "bucket": file_output.root,
-                            "key": file_output.path,
-                        },
-                    }
-                )
-                for name, file_output in self.outputs.artifacts.items()
-            ]
+            artifacts = []
+            for name, file_output in self.outputs.artifacts.items():
+                if isinstance(file_output, FilePut):
+                    artifacts.append(
+                        dict(
+                            {
+                                "name": name,
+                                "path": "/workdir/out",
+                                "s3": {
+                                    "endpoint": "s3.amazonaws.com",
+                                    "bucket": file_output.root,
+                                    "key": file_output.path,
+                                },
+                            }
+                        )
+                    )
+                elif isinstance(file_output, FileTmp):
+                    artifacts.append(
+                        dict(
+                            {
+                                "name": name,
+                                "path": f"/workdir/out/{file_output.path}",
+                            }
+                        )
+                    )
+                else:
+                    raise ScargoTranspilerError("Only FilPut and FileTmp supported.")
+
+            outputs_section["outputs"]["artifacts"] = artifacts
+
         template.update(outputs_section)
 
         template.update(
