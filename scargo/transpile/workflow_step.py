@@ -4,6 +4,7 @@ from typing import Any, Dict, NamedTuple, Optional
 
 import astor
 
+import scargo.transpile.resolve
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import utils
 from scargo.transpile.transformer import SourceToArgoTransformer
@@ -55,7 +56,7 @@ def get_inputs(call_node: ast.Call, context: Context) -> Transput:
     input_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_in", 0)
 
     if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
-        scargo_input = utils.resolve_transput(input_node, context)
+        scargo_input = scargo.transpile.resolve.resolve_transput(input_node, context)
     elif isinstance(input_node, ast.Name) and isinstance(context.inputs[input_node.id], Transput):
         scargo_input = context.inputs[input_node.id]
     else:
@@ -74,7 +75,7 @@ def get_outputs(call_node: ast.Call, context: Context) -> Transput:
     """
     output_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_out", 1)
     if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
-        scargo_output = utils.resolve_transput(output_node, context)
+        scargo_output = scargo.transpile.resolve.resolve_transput(output_node, context)
     elif isinstance(output_node, ast.Name) and isinstance(context.outputs[output_node.id], Transput):
         scargo_output = context.outputs[output_node.id]
     else:

@@ -5,7 +5,7 @@ import astor
 
 from scargo.core import WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile import utils
+from scargo.transpile import resolve, utils
 from scargo.transpile.types import Context
 from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
@@ -69,7 +69,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
             if len(node.targets) > 1:
                 raise ScargoTranspilerError("Multiple assignment not supported by Scargo Transpiler.")
 
-            resolved_transput = utils.resolve_transput(
+            resolved_transput = resolve.resolve_transput(
                 call_func,
                 context=Context(
                     locals=self.context.locals,
@@ -92,7 +92,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
         TODO: allow for other comparison inputs, such as Transputs and CSV values
         """
         if isinstance(node, ast.Subscript) and utils.is_workflow_param(node.value.id, self.context.locals):
-            return utils.resolve_workflow_param(node, self.context.locals)
+            return resolve.resolve_workflow_param(node, self.context.locals)
         elif isinstance(node, ast.Constant):
             return str(node.value)
         else:
