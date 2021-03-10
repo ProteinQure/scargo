@@ -44,7 +44,7 @@ def get_functiondef_node(name: str, tree: ast.Module) -> Optional[ast.FunctionDe
             return toplevel_node
 
 
-def get_inputs(call_node: ast.Call, context: Context, tree: ast.Module) -> Transput:
+def get_inputs(call_node: ast.Call, context: Context) -> Transput:
     """
     Parses the input parameters and artifacts from the workflow step and
     returns them as a Transput object (which has a `parameters` and an
@@ -55,7 +55,7 @@ def get_inputs(call_node: ast.Call, context: Context, tree: ast.Module) -> Trans
     input_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_in", 0)
 
     if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
-        scargo_input = utils.resolve_transput(input_node, context, tree)
+        scargo_input = utils.resolve_transput(input_node, context)
     elif isinstance(input_node, ast.Name) and isinstance(context.inputs[input_node.id], Transput):
         scargo_input = context.inputs[input_node.id]
     else:
@@ -66,15 +66,15 @@ def get_inputs(call_node: ast.Call, context: Context, tree: ast.Module) -> Trans
     return scargo_input
 
 
-def get_outputs(call_node: ast.Call, context: Context, tree: ast.Module) -> Transput:
+def get_outputs(call_node: ast.Call, context: Context) -> Transput:
     """
-    Parses the input parameters and artifacts from the workflow step and
+    Parses the output parameters and artifacts from the workflow step and
     returns them as a Transput object (which has a `parameters` and an
     `artifacts` attribute for easy access.
     """
     output_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_out", 1)
     if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
-        scargo_output = utils.resolve_transput(output_node, context, tree)
+        scargo_output = utils.resolve_transput(output_node, context)
     elif isinstance(output_node, ast.Name) and isinstance(context.outputs[output_node.id], Transput):
         scargo_output = context.outputs[output_node.id]
     else:
@@ -107,8 +107,8 @@ def make_workflow_step(
         call_node=call_node,
         name=name,
         image=get_image(functiondef_node),
-        inputs=get_inputs(call_node, context, tree),
-        outputs=get_outputs(call_node, context, tree),
+        inputs=get_inputs(call_node, context),
+        outputs=get_outputs(call_node, context),
         functiondef_node=functiondef_node,
         condition=condition,
     )

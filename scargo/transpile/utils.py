@@ -1,12 +1,21 @@
 """
 Utility functions used in the transpilation process.
+
+TODO: instead of accessing slices with `node.slice.value.value` create a utility function to exec them
 """
 import ast
-from typing import Any, Dict, List, Union
+import functools
+from typing import Any, Dict, List
+
+import astpretty
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.types import Context, Transput, FilePut, FileTmp
+from scargo.transpile.types import Context, FileAny, Transput, FilePut, FileTmp
+
+
+# used when debugging
+astpp = functools.partial(astpretty.pprint, show_offsets=False)
 
 
 def hyphenate(text: str) -> str:
@@ -99,40 +108,16 @@ def resolve_workflow_param(node: ast.Subscript, locals_context: Dict[str, Any]) 
     return value
 
 
-def resolve_mount_points(node: ast.Subscript, locals_context: Dict[str, Any], tree: ast.Module) -> str:
+def resolve_mount_points(node: ast.Subscript, context: Context) -> str:
     """
     Resolves a `node` if the object it refers to is a `MountPoints`
-    instance. This requires a few extra steps since `MountPoints` tend to
-    be nested objects containing one or several `MountPoint` (singular!)
-    objects which in turn can be made up of references to the global
-    workflow parameter object.
-
-    # TODO: reduce work by evaluating this structure and working with an actual MountPoints instance,
-    # similar to how resolve_workflow_parameter works
+    instance.
     """
-    subscripted_object_name = node.value.id
     subscript = node.slice.value.value
-
-    # use the AST to check if this was defined as a string
-    for toplevel_node in ast.iter_child_nodes(tree):
-        if isinstance(toplevel_node, ast.Assign):
-            relevant_target = list(filter(lambda t: t.id == subscripted_object_name, toplevel_node.targets))
-            if relevant_target and relevant_target[0].id == subscripted_object_name:
-
-                subscripted_object = get_variable_from_args_or_kwargs(toplevel_node.value, "__dict", 0)
-                resolved_node = list(
-                    filter(
-                        lambda tuple_: tuple_[0].value == subscript,
-                        zip(subscripted_object.keys, subscripted_object.values),
-                    )
-                )[0][1]
-
-                remote_subscript_object = get_variable_from_args_or_kwargs(resolved_node, "remote", 1)
-                if is_workflow_param(remote_subscript_object.value.id, locals_context):
-                    return resolve_workflow_param(remote_subscript_object, locals_context)
+    return context.mount_points[subscript]
 
 
-def resolve_subscript(node: ast.Subscript, context: Context, tree: ast.Module) -> str:
+def resolve_subscript(node: ast.Subscript, context: Context) -> str:
     """
     General method that is used to resolve Subscript nodes which typically
     tend to involve the global workflow parameters or mount points.
@@ -144,34 +129,33 @@ def resolve_subscript(node: ast.Subscript, context: Context, tree: ast.Module) -
     if is_workflow_param(subscripted_object_name, context.locals):
         return resolve_workflow_param(node, context.locals)
     elif is_mount_points(subscripted_object_name, context.locals):
-        return resolve_mount_points(node, context.locals, tree)
+        return resolve_mount_points(node, context)
     else:
         # TODO: should this error only be triggered if it also isn't resolvable via the locals of the function?
         raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
 
 
-def resolve_artifact(artifact_node: ast.Call, context: Context, tree: ast.Module) -> Union[FilePut, FileTmp]:
+def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
     if artifact_node.func.id == "TmpTransput":
         path = get_variable_from_args_or_kwargs(artifact_node, "name", 0)
         return FileTmp(path=path.value)
 
-    # TODO: this code will break if a subscript is assigned as a variable and then passed as an argument
     root_node = get_variable_from_args_or_kwargs(artifact_node, "root", 0)
     if isinstance(root_node, ast.Subscript):
-        root = resolve_subscript(root_node, context, tree)
+        root = resolve_subscript(root_node, context)
     else:
         raise ScargoTranspilerError("Can only resolve subscripts.")
 
     path_node = get_variable_from_args_or_kwargs(artifact_node, "path", 1)
     if isinstance(path_node, ast.Subscript):
-        path = resolve_subscript(path_node, context, tree)
+        path = resolve_subscript(path_node, context)
     else:
         raise ScargoTranspilerError("Can only resolve subscripts.")
 
     return FilePut(root=root, path=path)
 
 
-def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context, tree: ast.Module) -> Dict[str, str]:
+def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> Dict[str, str]:
     parameters = {}
     for name, value in zip(raw_parameters.keys, raw_parameters.values):
         if not isinstance(name, ast.Constant):
@@ -191,14 +175,14 @@ def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context, tree
                 else:
                     raise ScargoTranspilerError("Only ScargoInput and ScargoOutput work.")
             else:
-                parameters[name.value] = resolve_subscript(value, context, tree)
+                parameters[name.value] = resolve_subscript(value, context)
         else:
             raise ScargoTranspilerError("Should be a subscript or a constant?")
 
     return parameters
 
 
-def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context, tree: ast.Module) -> Dict[str, str]:
+def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context) -> Dict[str, FileAny]:
     artifacts = {}
     for name, value in zip(raw_artifacts.keys, raw_artifacts.values):
         if not isinstance(name, ast.Constant):
@@ -207,7 +191,7 @@ def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context, tree: 
         if isinstance(value, ast.Constant):
             artifacts[name.value] = value.value
         elif isinstance(value, ast.Call):
-            artifacts[name.value] = resolve_artifact(value, context, tree)
+            artifacts[name.value] = resolve_artifact(value, context)
         elif isinstance(value, ast.Subscript):
             attribute = value.value
             assert isinstance(attribute, ast.Attribute)
@@ -230,7 +214,7 @@ def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context, tree: 
     return artifacts
 
 
-def resolve_transput(transput_node: ast.Call, context: Context, tree: ast.Module) -> Transput:
+def resolve_transput(transput_node: ast.Call, context: Context) -> Transput:
     # TODO: use exec to resolve transput as an initial sanity check
     parameters = None
     artifacts = None
@@ -242,7 +226,7 @@ def resolve_transput(transput_node: ast.Call, context: Context, tree: ast.Module
         if not isinstance(raw_parameters, ast.Dict):
             raise ScargoTranspilerError("Transputs parameters should be assigned dictionaries.")
 
-        parameters = resolve_transput_parameters(raw_parameters, context, tree)
+        parameters = resolve_transput_parameters(raw_parameters, context)
 
         if len(parameters) == 0:
             parameters = None
@@ -253,7 +237,7 @@ def resolve_transput(transput_node: ast.Call, context: Context, tree: ast.Module
         if not isinstance(raw_artifacts, ast.Dict):
             raise ScargoTranspilerError("Transputs parameters should be assigned dictionaries.")
 
-        artifacts = resolve_transput_artifacts(raw_artifacts, context, tree)
+        artifacts = resolve_transput_artifacts(raw_artifacts, context)
 
         if len(artifacts) == 0:
             artifacts = None

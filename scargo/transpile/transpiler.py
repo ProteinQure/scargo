@@ -6,13 +6,23 @@ import ast
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-import astpretty
-
-from scargo.core import WorkflowParams
-from scargo.transpile.workflow_step import generate_template, WorkflowStep
-from scargo.transpile.types import Transput
+from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import entrypoint, yaml_io
+from scargo.transpile.workflow_step import generate_template, WorkflowStep
+from scargo.transpile.types import Transput
+
+
+def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
+    raw_mount_points = [
+        {"var": var, "value": val} for var, val in script_locals.items() if isinstance(val, MountPoints)
+    ]
+    if len(raw_mount_points) == 0:
+        raise ScargoTranspilerError("No mount points found.")
+    elif len(raw_mount_points) > 1:
+        raise ScargoTranspilerError("More than one mount point found.")
+    else:
+        return {var: val.remote for var, val in raw_mount_points[0]["value"].items()}
 
 
 def transpile_workflow_parameters(script_locals: Dict[str, Any]) -> WorkflowParams:
@@ -108,9 +118,6 @@ def build_template(
     # add entrypoint and define the corresponding workflow steps templates
     templates = []
 
-    workflow_steps[0][0].inputs
-    workflow_steps[0][0].outputs
-
     all_outputs = dict()
 
     entrypoint_steps = []
@@ -194,7 +201,8 @@ def transpile(path_to_script: Union[str, Path]) -> None:
 
     # parse the entrypoint function and it's corresponding steps into a transpilable format
     entrypoint_func = find_entrypoint(tree)
-    entrypoint_transpiler = entrypoint.EntrypointTranspiler(script_locals, tree)
+    mount_points = mount_points_from_locals(script_locals)
+    entrypoint_transpiler = entrypoint.EntrypointTranspiler(script_locals, workflow_params, mount_points, tree)
     entrypoint_transpiler.visit(entrypoint_func)
 
     # transpile the data structures from the previous steps into Argo workflow YAML

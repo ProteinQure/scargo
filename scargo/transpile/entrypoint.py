@@ -1,21 +1,28 @@
 import ast
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import astor
 
+from scargo.core import WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.types import Context
 from scargo.transpile import utils
+from scargo.transpile.types import Context
 from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
 
 class EntrypointTranspiler(ast.NodeVisitor):
-    def __init__(self, script_locals, tree) -> None:
-        # TODO: there should be an alternative to importing all the locals from the global scope
-        # mount_points and workflow_params should be saved in it's own attribute
+    def __init__(
+        self,
+        script_locals: Dict[str, Any],
+        workflow_params: WorkflowParams,
+        mount_points: Dict[str, str],
+        tree: ast.Module,
+    ) -> None:
         self.tree = tree
         self.steps: List[List[WorkflowStep]] = []
-        self.context = Context(locals=script_locals, inputs={}, outputs={})
+        self.context = Context(
+            locals=script_locals, inputs={}, outputs={}, workflow_params=workflow_params, mount_points=mount_points
+        )
 
     def visit_Call(self, node: ast.Call):
         """
@@ -24,7 +31,6 @@ class EntrypointTranspiler(ast.NodeVisitor):
         TODO: make sure the function calls are marked with @scargo
         TODO: allow evaluation of non-scargo functions?
         """
-        # TODO: easier to read if transput were resolved and passed
         self.steps.append(
             [
                 make_workflow_step(
@@ -65,8 +71,13 @@ class EntrypointTranspiler(ast.NodeVisitor):
 
             resolved_transput = utils.resolve_transput(
                 call_func,
-                context=Context(locals=self.context.locals, inputs=self.context.inputs, outputs=self.context.outputs),
-                tree=self.tree,
+                context=Context(
+                    locals=self.context.locals,
+                    inputs=self.context.inputs,
+                    outputs=self.context.outputs,
+                    workflow_params=self.context.workflow_params,
+                    mount_points=self.context.mount_points,
+                ),
             )
             transput_name = node.targets[0].id
             if transput == "ScargoInput":
@@ -131,7 +142,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
     def visit_If(self, node: ast.If):
         """
 
-        # TODO: support nested if-statements
+        TODO: support nested if-statements
         """
         all_steps: List[WorkflowStep] = []
         all_steps.append(self._resolve_If(node))

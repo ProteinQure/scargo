@@ -1,5 +1,7 @@
 from typing import Any, Dict, NamedTuple, Optional, Union
 
+from scargo.core import WorkflowParams
+
 
 class FilePut(NamedTuple):
     root: str
@@ -10,7 +12,8 @@ class FileTmp(NamedTuple):
     path: str
 
 
-Artifacts = Dict[str, Union[FilePut, FileTmp]]
+FileAny = Union[FilePut, FileTmp]
+Artifacts = Dict[str, FileAny]
 
 
 class Transput(NamedTuple):
@@ -35,3 +38,5 @@ class Context(NamedTuple):
     locals: Dict[str, Any]
     inputs: Dict[str, Transput]
     outputs: Dict[str, Transput]
+    workflow_params: WorkflowParams
+    mount_points: Dict[str, str]
