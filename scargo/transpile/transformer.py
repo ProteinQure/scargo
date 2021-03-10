@@ -45,9 +45,10 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         Converts Subscript nodes operating on ScargoInput/ScargoOutput argument names into strings refering to the
         inputs/outputs parameters/artifacts.
         """
-        if self._resolve_subscript(node, self.input_argument, self.output_argument) is not None:
+        resolved_subscript = self._resolve_subscript(node, self.input_argument, self.output_argument)
+        if resolved_subscript is not None:
             return ast.Constant(
-                value=self._resolve_subscript(node, self.input_argument, self.output_argument), kind=None, ctx=node.ctx
+                value=resolved_subscript, kind=None, ctx=node.ctx
             )
         else:
             return node
@@ -68,23 +69,18 @@ class SourceToArgoTransformer(ast.NodeTransformer):
             return None
 
         node_slice = node.slice
-        if not isinstance(node_slice, ast.Index):
-            # raise NotImplementedError("Expected slice to have an index.")
-            return None
-
-        node_slice_val = node_slice.value
-        if not isinstance(node_slice_val, ast.Constant):
+        if not isinstance(node_slice, ast.Constant):
             # raise NotImplementedError("Expected slice value to be constant.")
             return None
 
         if attr_name.id == input_arg and node_attr.attr == "parameters":
-            return "{{" + f"inputs.{node_attr.attr}.{node_slice_val.value}" + "}}"
+            return "{{" + f"inputs.{node_attr.attr}.{node_slice.value}" + "}}"
         if attr_name.id == input_arg and node_attr.attr == "artifacts":
-            return "{{" + f"inputs.{node_attr.attr}.{node_slice_val.value}.path" + "}}"
+            return "{{" + f"inputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
         elif attr_name.id == output_arg and node_attr.attr == "parameters":
-            return "{{" + f"outputs.{node_attr.attr}.{node_slice_val.value}" + "}}"
+            return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}" + "}}"
         elif attr_name.id == output_arg and node_attr.attr == "artifacts":
-            return "{{" + f"outputs.{node_attr.attr}.{node_slice_val.value}.path" + "}}"
+            return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
         else:
             return None
 

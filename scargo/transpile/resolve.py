@@ -1,3 +1,7 @@
+"""
+TODO: instead of accessing slices with `node.slice.value` create a utility function to exec them
+"""
+
 import ast
 from typing import Dict, Any
 
@@ -26,7 +30,7 @@ def resolve_workflow_param(node: ast.Subscript, locals_context: Dict[str, Any]) 
         subscripted_object = node.value.id
         if subscripted_object in locals_context:
             if isinstance(locals_context[subscripted_object], WorkflowParams):
-                value = "{{" + f"workflow.parameters.{node.slice.value.value}" + "}}"
+                value = "{{" + f"workflow.parameters.{node.slice.value}" + "}}"
 
     if value is None:
         raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(node)}")
@@ -39,7 +43,7 @@ def resolve_mount_points(node: ast.Subscript, context: Context) -> str:
     Resolves a `node` if the object it refers to is a `MountPoints`
     instance.
     """
-    subscript = node.slice.value.value
+    subscript = node.slice.value
     return context.mount_points[subscript]
 
 
@@ -50,7 +54,7 @@ def resolve_subscript(node: ast.Subscript, context: Context) -> str:
     """
     assert isinstance(node, ast.Subscript)
     subscripted_object_name = node.value.id
-    subscript = node.slice.value.value
+    subscript = node.slice.value
 
     if is_workflow_param(subscripted_object_name, context.locals):
         return resolve_workflow_param(node, context.locals)
@@ -125,7 +129,7 @@ def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context) -> Dic
             root = attribute.value.id
 
             # TODO: find more generic way to resolve slices. Probably evaluating them?
-            artifact_name = value.slice.value.value
+            artifact_name = value.slice.value
             if root in context.inputs:
                 artifacts[name.value] = context.inputs[root].artifacts[artifact_name]
             elif root in context.outputs:

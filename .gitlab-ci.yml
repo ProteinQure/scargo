@@ -6,7 +6,7 @@ stages:
 
 variables:
   DOCKER_REGISTRY: proteinqure
-  CI_RUNNER_IMAGE: $DOCKER_REGISTRY/basic-ci:stable
+  CI_RUNNER_IMAGE: $DOCKER_REGISTRY/basic-ci:33
 
 .rules:
   build: &build-rules

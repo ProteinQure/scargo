@@ -1,19 +1,11 @@
 """
 Utility functions used in the transpilation process.
-
-TODO: instead of accessing slices with `node.slice.value.value` create a utility function to exec them
 """
 import ast
-import functools
 from typing import Any, Dict, List
-
-import astpretty
 
 from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
-
-# used when debugging
-astpp = functools.partial(astpretty.pprint, show_offsets=False)
 
 
 def hyphenate(text: str) -> str:

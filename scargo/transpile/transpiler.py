@@ -11,7 +11,6 @@ from scargo.errors import ScargoTranspilerError
 from scargo.transpile import entrypoint, yaml_io
 from scargo.transpile.workflow_step import generate_template, WorkflowStep
 from scargo.transpile.types import Transput
-from scargo.transpile.utils import astpp
 
 
 def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
@@ -215,4 +214,4 @@ def transpile(path_to_script: Union[str, Path]) -> None:
     )
     yaml_io.write_workflow_to_yaml(path_to_script, transpiled_workflow)
 
-    astpp(tree)
+    print(ast.dump(tree, indent=3))
