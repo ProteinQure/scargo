@@ -40,7 +40,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         self.output_argument = output_argument
         self.outputs = outputs
 
-    def visit_Assign(self, node: ast.Assign):
+    def visit_Assign(self, node: ast.Assign) -> Union[ast.Assign, ast.With]:
         target = node.targets[0]
         if isinstance(target, ast.Subscript):
             file_path = SourceToArgoTransformer._resolve_subscript(target, self.input_argument, self.output_argument)
@@ -72,6 +72,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
                     ],
                 )
 
+        self.generic_visit(node)
         return node
 
     def visit_Subscript(self, node: ast.Subscript) -> Union[ast.Subscript, ast.Constant]:
@@ -81,10 +82,9 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         """
         resolved_subscript = self._resolve_subscript(node, self.input_argument, self.output_argument)
         if resolved_subscript is not None:
-            return ast.Constant(
-                value=resolved_subscript, kind=None, ctx=node.ctx
-            )
+            return ast.Constant(value=resolved_subscript, kind=None, ctx=node.ctx)
         else:
+            self.generic_visit(node)
             return node
 
     @staticmethod
