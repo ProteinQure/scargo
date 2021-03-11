@@ -40,6 +40,40 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         self.output_argument = output_argument
         self.outputs = outputs
 
+    def visit_Assign(self, node: ast.Assign):
+        target = node.targets[0]
+        if isinstance(target, ast.Subscript):
+            file_path = SourceToArgoTransformer._resolve_subscript(target, self.input_argument, self.output_argument)
+            if file_path is not None:
+                return ast.With(
+                    items=[
+                        ast.withitem(
+                            context_expr=ast.Call(
+                                func=ast.Name(id="open"),
+                                args=[
+                                    ast.Constant(value=file_path, kind=None),
+                                    ast.Constant(value="w+", kind=None),
+                                ],
+                                keywords=[],
+                            ),
+                            optional_vars=ast.Name(id="fi", ctx=ast.Store()),
+                        )
+                    ],
+                    body=[
+                        ast.Expr(
+                            value=ast.Call(
+                                func=ast.Attribute(
+                                    value=ast.Name(id="fi", ctx=ast.Load()), attr="write", ctx=ast.Load()
+                                ),
+                                args=[node.value],
+                                keywords=[],
+                            )
+                        )
+                    ],
+                )
+
+        return node
+
     def visit_Subscript(self, node: ast.Subscript) -> Union[ast.Subscript, ast.Constant]:
         """
         Converts Subscript nodes operating on ScargoInput/ScargoOutput argument names into strings refering to the
@@ -78,7 +112,7 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         if attr_name.id == input_arg and node_attr.attr == "artifacts":
             return "{{" + f"inputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
         elif attr_name.id == output_arg and node_attr.attr == "parameters":
-            return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}" + "}}"
+            return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
         elif attr_name.id == output_arg and node_attr.attr == "artifacts":
             return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
         else:
