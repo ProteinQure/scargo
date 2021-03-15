@@ -108,7 +108,8 @@ def make_workflow_step(
     """
     WorkflowStep contructor.
 
-    Since NamedTuples can't use constructors and @dataclass doesn't like modifying attributes in __post_init__ if frozen=True.
+    Since NamedTuples can't use constructors and @dataclass doesn't like modifying attributes in __post_init__
+    if frozen=True.
     """
 
     name = call_node.func.id

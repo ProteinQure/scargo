@@ -138,7 +138,6 @@ def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context) -> Dic
             assert attribute.attr == "artifacts"
             root = attribute.value.id
 
-            # TODO: find more generic way to resolve slices. Probably evaluating them?
             artifact_name = value.slice.value
             if root in context.inputs:
                 artifacts[name.value] = context.inputs[root].artifacts[artifact_name]
@@ -209,7 +208,8 @@ def resolve_cond(node: ast.If, context_locals: Dict[str, Any]) -> str:
     """
     Transpile the condition of an if-statement into an Argo-compatible condition string.
 
-    For example, `workflow_parameters["input-type"] == "alpha"` would be resolved into `'{{workflow.parameters.input-type}} == alpha'`
+    For example, `workflow_parameters["input-type"] == "alpha"` would be resolved
+    into `'{{workflow.parameters.input-type}} == alpha'`
 
     TODO: determine what operators are supported by Argo
     TODO: support if-statements with multiple conditions/comparisons
