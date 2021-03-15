@@ -12,6 +12,9 @@ from scargo.transpile.types import Context, FilePut, FileTmp, Transput
 
 
 class WorkflowStep(NamedTuple):
+    """
+    Representation of Scargo Workflow step for transpilation into Argo YAML.
+    """
     call_node: ast.Call
     name: str
     image: str
@@ -51,7 +54,7 @@ def get_inputs(call_node: ast.Call, context: Context) -> Transput:
     returns them as a Transput object (which has a `parameters` and an
     `artifacts` attribute for easy access.
 
-    TODO: inputs and outputs use similar logic
+    TODO: get_inputs and get_outputs use similar logic
     """
     input_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_in", 0)
 
@@ -87,6 +90,9 @@ def get_outputs(call_node: ast.Call, context: Context) -> Transput:
 
 
 def get_image(functiondef_node: ast.FunctionDef) -> str:
+    """
+    Get image argument from @scargo(image=image_name)
+    """
     scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", functiondef_node.decorator_list))[0]
     assert isinstance(scargo_decorator_node, ast.Call)
     return utils.get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
@@ -98,6 +104,11 @@ def make_workflow_step(
     context: Context,
     condition: Optional[str] = None,
 ) -> WorkflowStep:
+    """
+    WorkflowStep contructor.
+
+    Since NamedTuples can't use constructors and @dataclass doesn't like modifying attributes in __post_init__ if frozen=True.
+    """
 
     name = call_node.func.id
     functiondef_node = get_functiondef_node(name, tree)

@@ -14,6 +14,9 @@ from scargo.transpile.types import Transput
 
 
 def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Extract remote mount points from the MountPoints defined in Scargo.
+    """
     raw_mount_points = [
         {"var": var, "value": val} for var, val in script_locals.items() if isinstance(val, MountPoints)
     ]
@@ -54,6 +57,9 @@ def get_script_locals(source: str) -> Dict[str, Any]:
 
 
 def build_step_template(step: WorkflowStep, all_outputs: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Transpile a WorkflowStep into it's corresponding Argo YAML.
+    """
     all_parameters = []
 
     for name, value in step.inputs.parameters.items():
@@ -98,8 +104,6 @@ def build_template(
     """
     Convert the script to AST, traverse the tree and transpile the Python
     statements to an Argo workflow.
-
-    # TODO: add whitespace to make output more readable
     """
     # initialize the transpiled workflow dictionary
     # with the typical Argo header
@@ -146,7 +150,10 @@ def build_template(
     return transpiled_workflow
 
 
-def get_decorator_names(decorator_list: List) -> List[str]:
+def get_decorator_names(decorator_list: List[ast.expr]) -> List[str]:
+    """
+    Get names from a function's list of decorators accessed via the `decorator_list` method.
+    """
     decorator_names = []
     for decor in decorator_list:
 
@@ -161,7 +168,12 @@ def get_decorator_names(decorator_list: List) -> List[str]:
     return decorator_names
 
 
-def find_entrypoint(tree) -> ast.FunctionDef:
+def find_entrypoint(tree: ast.Module) -> ast.FunctionDef:
+    """
+    Search AST of Scargo script for functions marked with @entrypoint.
+
+    There can only be one function marked with entrypoint in valid Scargo script.
+    """
     entrypoints = []
     for top_level_node in tree.body:
         if isinstance(top_level_node, ast.FunctionDef):

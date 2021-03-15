@@ -41,6 +41,10 @@ class SourceToArgoTransformer(ast.NodeTransformer):
         self.outputs = outputs
 
     def visit_Assign(self, node: ast.Assign) -> Union[ast.Assign, ast.With]:
+        """
+        Output parameters can be the target of assignment and needs to be transformed into a file output to be Argo
+        compatible.
+        """
         target = node.targets[0]
         if isinstance(target, ast.Subscript):
             file_path = SourceToArgoTransformer._resolve_subscript(target, self.input_argument, self.output_argument)

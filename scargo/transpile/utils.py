@@ -48,6 +48,9 @@ def get_variables_from_args_and_kwargs(node: ast.Call, locals_context: Dict[str,
 
 
 def get_variables_from_call(node: ast.Call, expected_args: List[str] = None) -> Dict[str, ast.expr]:
+    """
+    Get all args and kwargs from a function call node.
+    """
     all_vars = dict()
 
     for a_i, arg in enumerate(node.args):

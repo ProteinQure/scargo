@@ -66,6 +66,10 @@ def resolve_subscript(node: ast.Subscript, context: Context) -> str:
 
 
 def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
+    """
+    Resolve a Transput's artifact initialization into FileTmp and FilePut as an intermediate step before transpilation
+    to Argo YAML.
+    """
     if artifact_node.func.id == "TmpTransput":
         path = get_variable_from_args_or_kwargs(artifact_node, "name", 0)
         return FileTmp(path=path.value)
@@ -86,6 +90,9 @@ def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
 
 
 def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> Dict[str, str]:
+    """
+    Resolve a Transput's parameters into a dictionary as an intermediary step before transpilation to Argo YAML.
+    """
     parameters = {}
     for name, value in zip(raw_parameters.keys, raw_parameters.values):
         if not isinstance(name, ast.Constant):
@@ -113,6 +120,9 @@ def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> D
 
 
 def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context) -> Dict[str, FileAny]:
+    """
+    Resolve a Transput's artifact into a dictionary mapping artifact names to their associate FilePut or FileTmp.
+    """
     artifacts = {}
     for name, value in zip(raw_artifacts.keys, raw_artifacts.values):
         if not isinstance(name, ast.Constant):
@@ -145,6 +155,9 @@ def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context) -> Dic
 
 
 def resolve_transput(transput_node: ast.Call, context: Context) -> Transput:
+    """
+    Resolve a Scargo Input or Output into a Transput as an intermediate step before transpilation into Argo YAML.
+    """
     # TODO: use exec to resolve transput as an initial sanity check
     parameters = None
     artifacts = None

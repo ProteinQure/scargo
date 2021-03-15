@@ -11,6 +11,14 @@ from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
 
 class EntrypointTranspiler(ast.NodeVisitor):
+    """
+    Visit and transpile all nodes of a function marked `@entrypoint`.
+
+    Transpilation includes:
+    1. Collecting Scargo Inputs and Outputs
+    2. Creating WorkflowSteps
+    """
+
     def __init__(
         self,
         script_locals: Dict[str, Any],
@@ -24,7 +32,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
             locals=script_locals, inputs={}, outputs={}, workflow_params=workflow_params, mount_points=mount_points
         )
 
-    def visit_Call(self, node: ast.Call):
+    def visit_Call(self, node: ast.Call) -> None:
         """
         Convert all function calls into Workflow Steps.
 
@@ -43,6 +51,12 @@ class EntrypointTranspiler(ast.NodeVisitor):
 
     @staticmethod
     def _scargo_transput(node: ast.Assign) -> Optional[str]:
+        """
+        Determine if a variable is being assigned:
+        1. A ScargoInput
+        2. A ScargoOutput
+        3. Neither
+        """
         call_func = node.value
         if isinstance(call_func, ast.Call):
             func_name = call_func.func.id
@@ -55,7 +69,7 @@ class EntrypointTranspiler(ast.NodeVisitor):
         else:
             return None
 
-    def visit_Assign(self, node: ast.Assign):
+    def visit_Assign(self, node: ast.Assign) -> None:
         """
         Evaluate all assignments, except for ScargoInput and ScargoOutput.
 
@@ -139,8 +153,9 @@ class EntrypointTranspiler(ast.NodeVisitor):
         else:
             raise NotImplementedError("Can only transpile function call inside of conditional statements.")
 
-    def visit_If(self, node: ast.If):
+    def visit_If(self, node: ast.If) -> None:
         """
+        Conditionals (if-statements) should be transpiled into Argo steps marked with `when: ` field.
 
         TODO: support nested if-statements
         """
