@@ -189,3 +189,64 @@ def resolve_transput(transput_node: ast.Call, context: Context) -> Transput:
         raise ScargoTranspilerError("Empty transput")
 
     return Transput(parameters=parameters, artifacts=artifacts)
+
+
+def resolve_compare(node: ast.expr, context_locals: Dict[str, Any]) -> str:
+    """
+    Resolve a variable involved in a comparison.
+
+    TODO: allow for other comparison inputs, such as Transputs and CSV values
+    """
+    if isinstance(node, ast.Subscript) and is_workflow_param(node, context_locals):
+        return resolve_workflow_param(node, context_locals)
+    elif isinstance(node, ast.Constant):
+        return str(node.value)
+    else:
+        raise ScargoTranspilerError("Only constants and Workflow allowed in comparison.")
+
+
+def resolve_cond(node: ast.If, context_locals: Dict[str, Any]) -> str:
+    """
+    Transpile the condition of an if-statement into an Argo-compatible condition string.
+
+    For example, `workflow_parameters["input-type"] == "alpha"` would be resolved into `'{{workflow.parameters.input-type}} == alpha'`
+
+    TODO: determine what operators are supported by Argo
+    TODO: support if-statements with multiple conditions/comparisons
+    """
+    compare = node.test
+    if not isinstance(compare, ast.Compare):
+        raise NotImplementedError("Only support individual comparisons.")
+    elif len(compare.ops) > 1:
+        raise NotImplementedError("Only support individual comparisons")
+
+    return " ".join(
+        (
+            resolve_compare(compare.left, context_locals),
+            astor.op_util.get_op_symbol(compare.ops[0]),
+            resolve_compare(compare.comparators[0], context_locals),
+        )
+    )
+
+
+def resolve_If(node: ast.If, tree: ast.Module, context: Context) -> WorkflowStep:
+    """
+    Make the resolved condition string and body into a workflow step.
+
+    TODO: support assignments, not just calls
+    TODO: support multi-statement bodies
+    """
+    if len(node.body) > 1:
+        raise NotImplementedError("Can't yet handle multi-statement bodies. Only single function-calls are allowed.")
+
+    body = node.body[0]
+    if isinstance(body, ast.Expr) and isinstance(body.value, ast.Call):
+        condition = resolve_cond(node, context.locals)
+        return make_workflow_step(
+            call_node=body.value,
+            tree=tree,
+            context=context,
+            condition=condition,
+        )
+    else:
+        raise NotImplementedError("Can only transpile function call inside of conditional statements.")
