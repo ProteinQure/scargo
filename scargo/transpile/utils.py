@@ -17,19 +17,19 @@ def hyphenate(text: str) -> str:
     return text.replace("_", "-")
 
 
-def is_workflow_param(object_name: str, locals_context: Dict[str, Any]) -> bool:
+def is_workflow_param(node: ast.Subscript, locals_context: Dict[str, Any]) -> bool:
     """
-    Checks if the `object_name` is a global WorkflowParams object.
-
-    TODO: this should take an ast.Subscript instead of a str
+    Checks if the subscripted node is a global WorkflowParams object.
     """
+    object_name = node.value.id
     return object_name in locals_context and isinstance(locals_context[object_name], WorkflowParams)
 
 
-def is_mount_points(object_name: str, locals_context: Dict[str, Any]) -> bool:
+def is_mount_points(node: ast.Subscript, locals_context: Dict[str, Any]) -> bool:
     """
-    Checks if the `object_name` is a global MountPoints object.
+    Checks if the subscripted node is a global MountPoints object.
     """
+    object_name = node.value.id
     return object_name in locals_context and isinstance(locals_context[object_name], MountPoints)
 
 

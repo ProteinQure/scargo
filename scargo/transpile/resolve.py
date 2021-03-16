@@ -41,13 +41,13 @@ def resolve_workflow_param(node: ast.Subscript, locals_context: Dict[str, Any]) 
     return value
 
 
-def resolve_mount_points(node: ast.Subscript, context: Context) -> str:
+def resolve_mount_points(node: ast.Subscript, mount_points: Dict[str, str]) -> str:
     """
     Resolves a `node` if the object it refers to is a `MountPoints`
     instance.
     """
     subscript = node.slice.value
-    return context.mount_points[subscript]
+    return mount_points[subscript]
 
 
 def resolve_subscript(node: ast.Subscript, context: Context) -> str:
@@ -56,16 +56,14 @@ def resolve_subscript(node: ast.Subscript, context: Context) -> str:
     tend to involve the global workflow parameters or mount points.
     """
     assert isinstance(node, ast.Subscript)
-    subscripted_object_name = node.value.id
-    subscript = node.slice.value
 
-    if is_workflow_param(subscripted_object_name, context.locals):
+    if is_workflow_param(node, context.locals):
         return resolve_workflow_param(node, context.locals)
-    elif is_mount_points(subscripted_object_name, context.locals):
-        return resolve_mount_points(node, context)
+    elif is_mount_points(node, context.locals):
+        return resolve_mount_points(node, context.mount_points)
     else:
         # TODO: should this error only be triggered if it also isn't resolvable via the locals of the function?
-        raise ScargoTranspilerError(f"Cannot resolve {subscripted_object_name}[{subscript}].")
+        raise ScargoTranspilerError(f"Cannot resolve {node.value.id}[{node.slice.value}].")
 
 
 def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
@@ -77,13 +75,15 @@ def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
         path = get_variable_from_args_or_kwargs(artifact_node, "name", 0)
         return FileTmp(path=path.value)
 
-    root_node = get_variable_from_args_or_kwargs(artifact_node, "root", 0)
+    vars = get_variables_from_args_and_kwargs(artifact_node, context.locals)
+
+    root_node = vars["root"]
     if isinstance(root_node, ast.Subscript):
         root = resolve_subscript(root_node, context)
     else:
         raise ScargoTranspilerError("Can only resolve subscripts.")
 
-    path_node = get_variable_from_args_or_kwargs(artifact_node, "path", 1)
+    path_node = vars["path"]
     if isinstance(path_node, ast.Subscript):
         path = resolve_subscript(path_node, context)
     else:
