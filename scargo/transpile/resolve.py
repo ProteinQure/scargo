@@ -5,6 +5,8 @@ TODO: instead of accessing slices with `node.slice.value` create a utility funct
 import ast
 from typing import Dict, Any
 
+import astor
+
 from scargo.core import WorkflowParams
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile.types import Context, FileAny, FileTmp, FilePut, Transput
@@ -14,6 +16,7 @@ from scargo.transpile.utils import (
     get_variable_from_args_or_kwargs,
     get_variables_from_args_and_kwargs,
 )
+from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
 
 def resolve_workflow_param(node: ast.Subscript, locals_context: Dict[str, Any]) -> str:
