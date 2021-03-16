@@ -10,7 +10,7 @@ from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import entrypoint, yaml_io
 from scargo.transpile.workflow_step import generate_template, WorkflowStep
-from scargo.transpile.types import Transput
+from scargo.transpile.types import FilePut, Transput
 
 
 def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
@@ -59,35 +59,62 @@ def get_script_locals(source: str) -> Dict[str, Any]:
 def build_step_template(step: WorkflowStep, all_outputs: Dict[str, str]) -> Dict[str, Any]:
     """
     Transpile a WorkflowStep into it's corresponding Argo YAML.
+
+    This involves declaring input parameters and artifacts, as well as optionally defining what condition is required
+    for the step to run.
     """
     all_parameters = []
 
-    for name, value in step.inputs.parameters.items():
-        if isinstance(value, Transput):
-            # TODO: step.inputs.parameters -> value should not be a whole Transput?
-            prev_step_output = list(value.parameters.keys())
-            assert len(prev_step_output) == 1
-            prev_step_param = prev_step_output[0]
-            all_parameters.append(
-                {
-                    "name": name,
-                    "value": "{{"
-                    + f"steps.exec-{all_outputs[prev_step_param]}.outputs.parameters.{prev_step_param}"
-                    + "}}",
-                }
-            )
-        else:
-            all_parameters.append(
-                {
-                    "name": name,
-                    "value": value,
-                }
-            )
+    if step.inputs.parameters is not None:
+        for name, value in step.inputs.parameters.items():
+            if isinstance(value, Transput):
+                # TODO: step.inputs.parameters -> value should not be a whole Transput?
+                prev_step_output = list(value.parameters.keys())
+                assert len(prev_step_output) == 1
+                prev_step_param = prev_step_output[0]
+                all_parameters.append(
+                    {
+                        "name": name,
+                        "value": "{{"
+                        + f"steps.exec-{all_outputs[prev_step_param]}.outputs.parameters.{prev_step_param}"
+                        + "}}",
+                    }
+                )
+            else:
+                all_parameters.append(
+                    {
+                        "name": name,
+                        "value": value,
+                    }
+                )
+
+    all_artifacts = []
+
+    if step.inputs.artifacts is not None:
+        for name, value in step.inputs.artifacts.items():
+            if isinstance(value, FilePut):
+                # TODO: it would be nice if the root was kept as a Workflow Parameter
+                all_artifacts.append(
+                    {"name": name, "s3": {"endpoint": "s3.amazonaws.com", "bucket": value.root, "key": value.path}}
+                )
+            else:
+                # TODO: oh no, the path isn't what we want, we want the output reference
+                all_artifacts.append({"name": name, "from": value.path})
+
+    all_args = dict()
+    if len(all_parameters) > 0:
+        all_args["parameters"] = all_parameters
+
+    if len(all_artifacts) > 0:
+        all_args["artifacts"] = all_artifacts
+
+    if len(all_parameters) == 0 and len(all_artifacts) == 0:
+        raise ScargoTranspilerError(f"No arguments found for step {step}.")
 
     step_template = {
         "name": step.hyphenated_name,
         "template": step.template_name,
-        "arguments": {"parameters": all_parameters},
+        "arguments": all_args,
     }
     if step.condition is not None:
         step_template["when"] = step.condition
