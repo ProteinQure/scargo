@@ -86,6 +86,12 @@ def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
     path_node = vars["path"]
     if isinstance(path_node, ast.Subscript):
         path = resolve_subscript(path_node, context)
+
+        if "name" in vars:
+            name_node = vars["name"]
+
+            if isinstance(name_node, ast.Subscript):
+                path = f"{path}/{resolve_subscript(name_node, context)}"
     else:
         raise ScargoTranspilerError("Can only resolve subscripts.")
 
