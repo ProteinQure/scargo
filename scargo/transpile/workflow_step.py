@@ -192,7 +192,7 @@ def generate_template(step: WorkflowStep) -> Dict[str, Any]:
 
     if step.inputs.artifacts is not None:
         inputs_section["inputs"]["artifacts"] = [
-            dict({"name": name, "from": f"/workdir/in/{name}"}) for name in step.inputs.artifacts
+            dict({"name": name, "path": f"/workdir/in/{name}"}) for name in step.inputs.artifacts
         ]
 
     template.update(inputs_section)
