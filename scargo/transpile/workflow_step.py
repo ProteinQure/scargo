@@ -7,7 +7,7 @@ import astor
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import resolve, utils
 from scargo.transpile.transformer import SourceToArgoTransformer
-from scargo.transpile.types import Context, FilePut, FileTmp, Transput
+from scargo.transpile.types import Context, FilePut, FileTmp, Origin, Parameter, Transput
 
 
 class WorkflowStep(NamedTuple):
@@ -70,7 +70,7 @@ def get_inputs(call_node: ast.Call, context: Context) -> Transput:
     return scargo_input
 
 
-def get_outputs(call_node: ast.Call, context: Context) -> Transput:
+def get_outputs(call_node: ast.Call, context: Context, name: str) -> Transput:
     """
     Parses the output parameters and artifacts from the workflow step and
     returns them as a Transput object (which has a `parameters` and an
@@ -79,15 +79,35 @@ def get_outputs(call_node: ast.Call, context: Context) -> Transput:
     output_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_out", 1)
 
     if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
-        scargo_output = resolve.resolve_transput(output_node, context)
+        scargo_outputs = resolve.resolve_transput(output_node, context)
     elif isinstance(output_node, ast.Name) and isinstance(context.outputs[output_node.id], Transput):
-        scargo_output = context.outputs[output_node.id]
+        scargo_outputs = context.outputs[output_node.id]
+
+        if scargo_outputs.parameters is not None:
+            param_update = dict()
+            for key, param in scargo_outputs.parameters.items():
+                param_update[key] = Parameter(value=param.value, origin=Origin(step=name, name=key))
+
+            scargo_outputs.parameters.update(param_update)
+
+        if scargo_outputs.artifacts is not None:
+            artifact_update = dict()
+            for key, artifact in scargo_outputs.artifacts.items():
+                if isinstance(artifact, FileTmp):
+                    if artifact.origin is not None:
+                        raise ScargoTranspilerError(
+                            f"Assigning a TmpFile as output for {name}, but it's already been used as an output for step {artifact.origin.step}"
+                        )
+
+                    artifact_update[key] = FileTmp(path=artifact.path, origin=Origin(step=name, name=key))
+
+            scargo_outputs.artifacts.update(artifact_update)
     else:
         raise ScargoTranspilerError(
             "Unexpected input type. Second argument to a @scargo function must be a `ScargoOutput`."
         )
 
-    return scargo_output
+    return scargo_outputs
 
 
 def get_image(functiondef_node: ast.FunctionDef) -> str:
@@ -122,7 +142,7 @@ def make_workflow_step(
         name=name,
         image=get_image(functiondef_node),
         inputs=get_inputs(call_node, context),
-        outputs=get_outputs(call_node, context),
+        outputs=get_outputs(call_node, context, name),
         functiondef_node=functiondef_node,
         condition=condition,
     )
@@ -166,18 +186,24 @@ def generate_template(step: WorkflowStep) -> Dict[str, Any]:
     template: Dict[str, Any] = {"name": step.template_name}
 
     inputs_section = {"inputs": dict()}
+
     if step.inputs.parameters is not None:
         inputs_section["inputs"]["parameters"] = [{"name": key} for key in step.inputs.parameters]
+
     if step.inputs.artifacts is not None:
         inputs_section["inputs"]["artifacts"] = [
-            dict({"name": name, "from": f"/workdir/in/{file_input.path}"})
-            for name, file_input in step.inputs.artifacts.items()
+            dict({"name": name, "from": f"/workdir/in/{name}"}) for name in step.inputs.artifacts
         ]
+
     template.update(inputs_section)
 
     outputs_section = {"outputs": dict()}
+
     if step.outputs.parameters is not None:
-        outputs_section["outputs"]["parameters"] = [{"name": key} for key in step.outputs.parameters]
+        outputs_section["outputs"]["parameters"] = [
+            {"name": name, "valueFrom": {"path": f"/workdir/out/{name}"}} for name in step.outputs.parameters
+        ]
+
     if step.outputs.artifacts is not None:
         artifacts = []
         for name, file_output in step.outputs.artifacts.items():
@@ -200,7 +226,7 @@ def generate_template(step: WorkflowStep) -> Dict[str, Any]:
                     dict(
                         {
                             "name": name,
-                            "path": f"/workdir/out/{file_output.path}",
+                            "path": f"/workdir/out/{name}",
                         }
                     )
                 )

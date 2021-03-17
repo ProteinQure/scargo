@@ -10,7 +10,7 @@ from scargo.core import MountPoints, WorkflowParams
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile import entrypoint, yaml_io
 from scargo.transpile.workflow_step import generate_template, WorkflowStep
-from scargo.transpile.types import FilePut, Transput
+from scargo.transpile.types import FilePut
 
 
 def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
@@ -56,7 +56,7 @@ def get_script_locals(source: str) -> Dict[str, Any]:
     return script_locals
 
 
-def build_step_template(step: WorkflowStep, all_outputs: Dict[str, str]) -> Dict[str, Any]:
+def build_step_template(step: WorkflowStep) -> Dict[str, Any]:
     """
     Transpile a WorkflowStep into it's corresponding Argo YAML.
 
@@ -66,40 +66,42 @@ def build_step_template(step: WorkflowStep, all_outputs: Dict[str, str]) -> Dict
     all_parameters = []
 
     if step.inputs.parameters is not None:
-        for name, value in step.inputs.parameters.items():
-            if isinstance(value, Transput):
-                # TODO: step.inputs.parameters -> value should not be a whole Transput?
-                prev_step_output = list(value.parameters.keys())
-                assert len(prev_step_output) == 1
-                prev_step_param = prev_step_output[0]
+        for name, param in step.inputs.parameters.items():
+            print(param)
+            if param.origin is not None:
                 all_parameters.append(
                     {
                         "name": name,
-                        "value": "{{"
-                        + f"steps.exec-{all_outputs[prev_step_param]}.outputs.parameters.{prev_step_param}"
-                        + "}}",
+                        "value": "{{" + f"steps.exec-{param.origin.step}.outputs.parameters.{param.origin.name}" + "}}",
                     }
                 )
             else:
                 all_parameters.append(
                     {
                         "name": name,
-                        "value": value,
+                        "value": param.value,
                     }
                 )
 
     all_artifacts = []
 
     if step.inputs.artifacts is not None:
-        for name, value in step.inputs.artifacts.items():
-            if isinstance(value, FilePut):
+        for name, artifact in step.inputs.artifacts.items():
+            if isinstance(artifact, FilePut):
                 # TODO: it would be nice if the root was kept as a Workflow Parameter
                 all_artifacts.append(
-                    {"name": name, "s3": {"endpoint": "s3.amazonaws.com", "bucket": value.root, "key": value.path}}
+                    {
+                        "name": name,
+                        "s3": {"endpoint": "s3.amazonaws.com", "bucket": artifact.root, "key": artifact.path},
+                    }
                 )
             else:
-                # TODO: oh no, the path isn't what we want, we want the output reference
-                all_artifacts.append({"name": name, "from": value.path})
+                all_artifacts.append(
+                    {
+                        "name": name,
+                        "from": "{{" + f"steps.{artifact.origin.step}.outputs.artifacts.{artifact.origin.name}" + "}}",
+                    }
+                )
 
     all_args = dict()
     if len(all_parameters) > 0:
@@ -149,17 +151,11 @@ def build_template(
     # add entrypoint and define the corresponding workflow steps templates
     templates = []
 
-    all_outputs = dict()
-
     entrypoint_groups = []
     for step_group in workflow_steps:
         built_steps = []
         for step in step_group:
-            if step.outputs.parameters is not None:
-                for output in step.outputs.parameters.keys():
-                    all_outputs[output] = step.hyphenated_name
-
-            built_steps.append(build_step_template(step, all_outputs))
+            built_steps.append(build_step_template(step))
         entrypoint_groups.append(built_steps)
 
     entrypoint_template = {

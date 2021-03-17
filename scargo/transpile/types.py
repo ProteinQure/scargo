@@ -8,12 +8,28 @@ class FilePut(NamedTuple):
     path: str
 
 
+class Origin(NamedTuple):
+    """
+    For parameters and artifacts passed between steps, the step where they are first used as outputs (and thus assigned
+    a value in Argo) need to be tracked.
+    """
+
+    step: str
+    name: str
+
+
 class FileTmp(NamedTuple):
     path: str
+    origin: Optional[Origin] = None
 
 
 FileAny = Union[FilePut, FileTmp]
 Artifacts = Dict[str, FileAny]
+
+
+class Parameter(NamedTuple):
+    value: Optional[Any] = None
+    origin: Optional[Origin] = None
 
 
 class Transput(NamedTuple):
@@ -22,7 +38,7 @@ class Transput(NamedTuple):
     access to the WorkflowStep input/output parameters and artifacts.
     """
 
-    parameters: Optional[Dict[str, str]] = None
+    parameters: Optional[Dict[str, Parameter]] = None
     artifacts: Optional[Artifacts] = None
 
     @property

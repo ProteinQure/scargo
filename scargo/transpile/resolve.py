@@ -9,7 +9,7 @@ import astor
 
 from scargo.core import WorkflowParams
 from scargo.errors import ScargoTranspilerError
-from scargo.transpile.types import Context, FileAny, FileTmp, FilePut, Transput
+from scargo.transpile.types import Context, FileAny, FileTmp, FilePut, Parameter, Transput
 from scargo.transpile.utils import (
     is_workflow_param,
     is_mount_points,
@@ -92,7 +92,7 @@ def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
     return FilePut(root=root, path=path)
 
 
-def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> Dict[str, str]:
+def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> Dict[str, Parameter]:
     """
     Resolve a Transput's parameters into a dictionary as an intermediary step before transpilation to Argo YAML.
     """
@@ -102,20 +102,24 @@ def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> D
             raise ScargoTranspilerError("Scargo can only transpile constant string dictionary keys.")
 
         if isinstance(value, ast.Constant):
-            parameters[name.value] = value.value
+            parameters[name.value] = Parameter(value=value.value, origin=None)
         elif isinstance(value, ast.Subscript):
             subscript = value.value
-            if isinstance(subscript, ast.Attribute):
+            sub_slice = value.slice
+            if isinstance(subscript, ast.Attribute) and isinstance(sub_slice, ast.Constant):
                 assert subscript.attr == "parameters"
                 attr_name = subscript.value.id
+
                 if attr_name in context.inputs:
-                    parameters[name.value] = context.inputs[attr_name]
+                    context_param = context.inputs[attr_name].parameters[sub_slice.value]
                 elif attr_name in context.outputs:
-                    parameters[name.value] = context.outputs[attr_name]
+                    context_param = context.outputs[attr_name].parameters[sub_slice.value]
                 else:
                     raise ScargoTranspilerError("Only ScargoInput and ScargoOutput work.")
+
+                parameters[name.value] = Parameter(value=context_param.value, origin=context_param.origin)
             else:
-                parameters[name.value] = resolve_subscript(value, context)
+                parameters[name.value] = Parameter(value=resolve_subscript(value, context))
         else:
             raise ScargoTranspilerError("Should be a subscript or a constant?")
 
