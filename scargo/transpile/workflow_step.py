@@ -142,7 +142,7 @@ def make_workflow_step(
         name=name,
         image=get_image(functiondef_node),
         inputs=get_inputs(call_node, context),
-        outputs=get_outputs(call_node, context, name),
+        outputs=get_outputs(call_node, context, utils.hyphenate(name)),
         functiondef_node=functiondef_node,
         condition=condition,
     )
