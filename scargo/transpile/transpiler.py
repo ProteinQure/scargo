@@ -151,18 +151,20 @@ def build_template(
 
     all_outputs = dict()
 
-    entrypoint_steps = []
+    entrypoint_groups = []
     for step_group in workflow_steps:
+        built_steps = []
         for step in step_group:
             if step.outputs.parameters is not None:
                 for output in step.outputs.parameters.keys():
                     all_outputs[output] = step.hyphenated_name
 
-            entrypoint_steps.append(build_step_template(step, all_outputs))
+            built_steps.append(build_step_template(step, all_outputs))
+        entrypoint_groups.append(built_steps)
 
     entrypoint_template = {
         "name": entrypoint_name,
-        "steps": [entrypoint_steps],
+        "steps": entrypoint_groups,
     }
     templates.append(entrypoint_template)
 
