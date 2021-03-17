@@ -243,7 +243,7 @@ def generate_template(step: WorkflowStep) -> Dict[str, Any]:
                 {
                     "name": "mkdir",
                     "image": "alpine:latest",
-                    "command": ["mkdir", "-p", "/workdir/out"],
+                    "command": ["mkdir", "-p", "/workdir/out", "/workdir/in"],
                     "mirrorVolumeMounts": True,
                 },
                 {
