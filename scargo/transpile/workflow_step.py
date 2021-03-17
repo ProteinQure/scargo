@@ -59,15 +59,15 @@ def get_inputs(call_node: ast.Call, context: Context) -> Transput:
     input_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_in", 0)
 
     if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
-        scargo_input = resolve.resolve_transput(input_node, context)
+        scargo_inputs = resolve.resolve_transput(input_node, context)
     elif isinstance(input_node, ast.Name) and isinstance(context.inputs[input_node.id], Transput):
-        scargo_input = context.inputs[input_node.id]
+        scargo_inputs = context.inputs[input_node.id]
     else:
         raise ScargoTranspilerError(
             "Unexpected input type. First argument to a @scargo function must be a `ScargoInput`."
         )
 
-    return scargo_input
+    return scargo_inputs
 
 
 def get_outputs(call_node: ast.Call, context: Context, name: str) -> Transput:
