@@ -96,7 +96,8 @@ def get_outputs(call_node: ast.Call, context: Context, name: str) -> Transput:
                 if isinstance(artifact, FileTmp):
                     if artifact.origin is not None:
                         raise ScargoTranspilerError(
-                            f"Assigning a TmpFile as output for {name}, but it's already been used as an output for step {artifact.origin.step}"
+                            f"Assigning a TmpFile as output for {name}, but it's already been used as an output for"
+                            f"step {artifact.origin.step}"
                         )
 
                     artifact_update[key] = FileTmp(path=artifact.path, origin=Origin(step=name, name=key))
