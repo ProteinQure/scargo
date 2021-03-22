@@ -11,9 +11,9 @@ from scargo.core import WorkflowParams
 from scargo.errors import ScargoTranspilerError
 from scargo.transpile.types import Context, FileAny, FileTmp, FilePut, Parameter, Transput
 from scargo.transpile.utils import (
+    get_variables_from_call,
     is_workflow_param,
     is_mount_points,
-    get_variable_from_args_or_kwargs,
     get_variables_from_args_and_kwargs,
 )
 from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
@@ -72,7 +72,7 @@ def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
     to Argo YAML.
     """
     if artifact_node.func.id == "TmpTransput":
-        path = get_variable_from_args_or_kwargs(artifact_node, "name", 0)
+        path = get_variables_from_call(artifact_node, ["name"])["name"]
         return FileTmp(path=path.value)
 
     vars = get_variables_from_args_and_kwargs(artifact_node, context.locals)

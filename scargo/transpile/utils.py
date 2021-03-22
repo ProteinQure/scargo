@@ -5,7 +5,6 @@ import ast
 from typing import Any, Dict, List
 
 from scargo.core import MountPoints, WorkflowParams
-from scargo.errors import ScargoTranspilerError
 
 
 def hyphenate(text: str) -> str:
@@ -60,20 +59,3 @@ def get_variables_from_call(node: ast.Call, expected_args: List[str] = None) -> 
         all_vars[keyword.arg] = keyword.value
 
     return all_vars
-
-
-def get_variable_from_args_or_kwargs(node: ast.Call, variable_name: str, arg_index: int) -> ast.expr:
-    """
-    We don't know if the user has passed a positional or a keyworded
-    argument to `node` which result in different ASTs. Since this is a
-    common occurence, this method figures it out for you and returns the
-    node representing the variable.
-    """
-    if node.args and len(node.args) > arg_index:
-        return node.args[arg_index]
-    elif node.keywords:
-        filtered_keywords = list(filter(lambda k: k.arg == variable_name, node.keywords))
-        if filtered_keywords:
-            return filtered_keywords[0].value
-
-    raise ScargoTranspilerError(f"Can't parse {variable_name} from {node.func.id}.")

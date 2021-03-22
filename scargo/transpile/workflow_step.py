@@ -56,7 +56,7 @@ def get_inputs(call_node: ast.Call, context: Context) -> Transput:
 
     TODO: get_inputs and get_outputs use similar logic
     """
-    input_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_in", 0)
+    input_node = utils.get_variables_from_call(call_node, ["scargo_in", "scargo_out"])["scargo_in"]
 
     if isinstance(input_node, ast.Call) and input_node.func.id == "ScargoInput":
         scargo_inputs = resolve.resolve_transput(input_node, context)
@@ -76,7 +76,7 @@ def get_outputs(call_node: ast.Call, context: Context, name: str) -> Transput:
     returns them as a Transput object (which has a `parameters` and an
     `artifacts` attribute for easy access.
     """
-    output_node = utils.get_variable_from_args_or_kwargs(call_node, "scargo_out", 1)
+    output_node = utils.get_variables_from_call(call_node, ["scargo_in", "scargo_out"])["scargo_out"]
 
     if isinstance(output_node, ast.Call) and output_node.func.id == "ScargoOutput":
         scargo_outputs = resolve.resolve_transput(output_node, context)
@@ -117,7 +117,9 @@ def get_image(functiondef_node: ast.FunctionDef) -> str:
     """
     scargo_decorator_node = list(filter(lambda d: d.func.id == "scargo", functiondef_node.decorator_list))[0]
     assert isinstance(scargo_decorator_node, ast.Call)
-    return utils.get_variable_from_args_or_kwargs(scargo_decorator_node, "image", 0).value
+    image_node = utils.get_variables_from_call(scargo_decorator_node, ["image"])["image"]
+    assert isinstance(image_node, ast.Constant)
+    return image_node.value
 
 
 def make_workflow_step(
