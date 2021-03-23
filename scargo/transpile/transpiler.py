@@ -67,7 +67,6 @@ def build_step_template(step: WorkflowStep) -> Dict[str, Any]:
 
     if step.inputs.parameters is not None:
         for name, param in step.inputs.parameters.items():
-            print(param)
             if param.origin is not None:
                 all_parameters.append(
                     {
