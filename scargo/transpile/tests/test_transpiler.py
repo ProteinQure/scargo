@@ -11,7 +11,7 @@ from scargo.core import MountPoint, MountPoints, WorkflowParams
 from scargo.transpile import transpiler
 
 
-def test_transpile_parameters(scargo_workflow_params_file):
+def test_transpile_workflow_parameters(scargo_workflow_params_file):
     """
     Test the standalone transpile() function with a small script that contains
     a definition of workflow parameters only.

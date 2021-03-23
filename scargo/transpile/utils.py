@@ -34,7 +34,7 @@ def is_mount_points(node: ast.Subscript, locals_context: Dict[str, Any]) -> bool
 
 def get_variables_from_call(node: ast.Call, expected_args: List[str] = None) -> Dict[str, ast.expr]:
     """
-    Get all args and kwargs from a function call node.
+    Get all args and kwargs from a function call AST node.
     """
     all_vars = dict()
 

@@ -23,7 +23,7 @@ def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
     if len(raw_mount_points) == 0:
         raise ScargoTranspilerError("No mount points found.")
     elif len(raw_mount_points) > 1:
-        raise ScargoTranspilerError("More than one mount point found.")
+        raise ScargoTranspilerError("More than one MountPoints instance found.")
     else:
         return {var: val.remote for var, val in raw_mount_points[0]["value"].items()}
 
@@ -177,6 +177,11 @@ def build_template(
 def get_decorator_names(decorator_list: List[ast.expr]) -> List[str]:
     """
     Get names from a function's list of decorators accessed via the `decorator_list` method.
+
+    Parameters
+    ----------
+    decorator_list : list
+        List of all decorators applied to a given function.
     """
     decorator_names = []
     for decor in decorator_list:

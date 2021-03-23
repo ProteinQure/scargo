@@ -4,6 +4,10 @@ from scargo.core import WorkflowParams
 
 
 class FilePut(NamedTuple):
+    """
+    Artifact permanently stored on S3.
+    """
+
     root: str
     path: str
 
@@ -19,6 +23,10 @@ class Origin(NamedTuple):
 
 
 class FileTmp(NamedTuple):
+    """
+    Temporary artifact passed between steps, but with no expectation of being stored permanently.
+    """
+
     path: str
     origin: Optional[Origin] = None
 
