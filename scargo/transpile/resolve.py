@@ -1,7 +1,3 @@
-"""
-TODO: instead of accessing slices with `node.slice.value` create a utility function to exec them
-"""
-
 import ast
 from typing import Dict, Any
 
@@ -18,26 +14,31 @@ from scargo.transpile.utils import (
 from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
 
+def resolve_sub_slice(node: ast.Subscript) -> Any:
+    node_slice = node.slice
+    if isinstance(node_slice, ast.Constant):
+        return node_slice.value
+    else:
+        raise ScargoTranspilerError(
+            f"Expected slice to be a constant. Cannot handle:\n{ast.dump(node_slice, indent=3)}"
+        )
+
+
 def resolve_workflow_param(node: ast.Subscript, locals_context: Dict[str, Any]) -> str:
     """
-    Given a Subscript or Constant node use the
-    locals_context of the scargo script and the AST to transpile this node
-    either into the actual parameter value or into a reference to the
-    global Argo workflow parameters.
+    Given a Subscript node known to be a Workflow Parameter use the locals_context of the scargo script and the AST to
+    transpile this node into a reference to the global Argo workflow parameters.
     """
-
-    value = None
-    if isinstance(node, ast.Subscript):
-        # could be a list, tuple or dict
-        subscripted_object = node.value.id
-        if subscripted_object in locals_context:
-            if isinstance(locals_context[subscripted_object], WorkflowParams):
-                value = "{{" + f"workflow.parameters.{node.slice.value}" + "}}"
-
-    if value is None:
-        raise ScargoTranspilerError(f"Cannot resolve parameter value from node type {type(node)}")
-
-    return value
+    subscripted_object = node.value.id
+    sub_slice = resolve_sub_slice(node)
+    if (
+        subscripted_object in locals_context
+        and isinstance(locals_context[subscripted_object], WorkflowParams)
+        and isinstance(locals_context[subscripted_object][sub_slice], str)
+    ):
+        return "{{" + f"workflow.parameters.{sub_slice}" + "}}"
+    else:
+        raise ScargoTranspilerError(f"Cannot resolve parameter value from node:\n{ast.dump(node, indent=3)}")
 
 
 def resolve_mount_points(node: ast.Subscript, mount_points: Dict[str, str]) -> str:
@@ -45,8 +46,7 @@ def resolve_mount_points(node: ast.Subscript, mount_points: Dict[str, str]) -> s
     Resolves a `node` if the object it refers to is a `MountPoints`
     instance.
     """
-    subscript = node.slice.value
-    return mount_points[subscript]
+    return mount_points[resolve_sub_slice(node)]
 
 
 def resolve_subscript(node: ast.Subscript, context: Context) -> str:
@@ -110,15 +110,15 @@ def resolve_transput_parameters(raw_parameters: ast.Dict, context: Context) -> D
             parameters[name.value] = Parameter(value=value.value, origin=None)
         elif isinstance(value, ast.Subscript):
             subscript = value.value
-            sub_slice = value.slice
-            if isinstance(subscript, ast.Attribute) and isinstance(sub_slice, ast.Constant):
+            slice_val = resolve_sub_slice(value)
+            if isinstance(subscript, ast.Attribute):
                 assert subscript.attr == "parameters"
                 attr_name = subscript.value.id
 
                 if attr_name in context.inputs:
-                    context_param = context.inputs[attr_name].parameters[sub_slice.value]
+                    context_param = context.inputs[attr_name].parameters[slice_val]
                 elif attr_name in context.outputs:
-                    context_param = context.outputs[attr_name].parameters[sub_slice.value]
+                    context_param = context.outputs[attr_name].parameters[slice_val]
                 else:
                     raise ScargoTranspilerError("Only ScargoInput and ScargoOutput work.")
 
@@ -150,7 +150,7 @@ def resolve_transput_artifacts(raw_artifacts: ast.Dict, context: Context) -> Dic
             assert attribute.attr == "artifacts"
             root = attribute.value.id
 
-            artifact_name = value.slice.value
+            artifact_name = resolve_sub_slice(value)
             if root in context.inputs:
                 artifacts[name.value] = context.inputs[root].artifacts[artifact_name]
             elif root in context.outputs:
