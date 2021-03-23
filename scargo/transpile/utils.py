@@ -32,20 +32,6 @@ def is_mount_points(node: ast.Subscript, locals_context: Dict[str, Any]) -> bool
     return object_name in locals_context and isinstance(locals_context[object_name], MountPoints)
 
 
-def get_variables_from_args_and_kwargs(node: ast.Call, locals_context: Dict[str, ast.expr]) -> Dict[str, ast.expr]:
-    # TODO: call exec on this node and log whatever errors happen instead of trying to manually determine errors
-
-    all_vars = dict()
-    klass = locals_context[node.func.id]
-    # proceeding assuming the parameters are assigned correctly
-    # TODO: actually assign args later, lol
-
-    for keyword in node.keywords:
-        all_vars[keyword.arg] = keyword.value
-
-    return all_vars
-
-
 def get_variables_from_call(node: ast.Call, expected_args: List[str] = None) -> Dict[str, ast.expr]:
     """
     Get all args and kwargs from a function call node.

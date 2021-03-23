@@ -14,7 +14,6 @@ from scargo.transpile.utils import (
     get_variables_from_call,
     is_workflow_param,
     is_mount_points,
-    get_variables_from_args_and_kwargs,
 )
 from scargo.transpile.workflow_step import WorkflowStep, make_workflow_step
 
@@ -75,7 +74,7 @@ def resolve_artifact(artifact_node: ast.Call, context: Context) -> FileAny:
         path = get_variables_from_call(artifact_node, ["name"])["name"]
         return FileTmp(path=path.value)
 
-    vars = get_variables_from_args_and_kwargs(artifact_node, context.locals)
+    vars = get_variables_from_call(artifact_node, ["root", "path", "name"])
 
     root_node = vars["root"]
     if isinstance(root_node, ast.Subscript):
@@ -173,7 +172,7 @@ def resolve_transput(transput_node: ast.Call, context: Context) -> Transput:
     # TODO: use exec to resolve transput as an initial sanity check
     parameters = None
     artifacts = None
-    node_args = get_variables_from_args_and_kwargs(transput_node, context.locals)
+    node_args = get_variables_from_call(transput_node, ["parameters", "artifacts"])
 
     if "parameters" in node_args:
         raw_parameters = node_args["parameters"]
