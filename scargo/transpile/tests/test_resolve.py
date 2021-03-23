@@ -13,9 +13,8 @@ from scargo.transpile.types import Context, FilePut, FileTmp, Origin, Parameter,
     [
         (
             ast.Subscript(
-                value=ast.Name(id="workflow_parameters", ctx=ast.Load()),
+                value=ast.Name(id="workflow_parameters"),
                 slice=ast.Constant(value="word-index"),
-                ctx=ast.Load(),
             ),
             {"workflow_parameters": WorkflowParams({"word-index": "1"})},
             "{{workflow.parameters.word-index}}",
