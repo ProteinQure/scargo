@@ -115,9 +115,8 @@ class SourceToArgoTransformer(ast.NodeTransformer):
             return "{{" + f"inputs.{node_attr.attr}.{node_slice.value}" + "}}"
         if attr_name.id == input_arg and node_attr.attr == "artifacts":
             return "{{" + f"inputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
-        elif attr_name.id == output_arg and node_attr.attr == "parameters":
-            return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
-        elif attr_name.id == output_arg and node_attr.attr == "artifacts":
+        elif attr_name.id == output_arg and (node_attr.attr == "parameters" or node_attr.attr == "artifacts"):
+            # both output parameters and artifacts are output to files to be processed by Argo
             return "{{" + f"outputs.{node_attr.attr}.{node_slice.value}.path" + "}}"
         else:
             return None
