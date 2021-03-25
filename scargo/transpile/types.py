@@ -55,7 +55,7 @@ class Transput(NamedTuple):
         True if at least one of the two class attributes is not None or an
         empty dict.
         """
-        return (self.parameters is None or not self.parameters) or (self.artifacts is None or not self.artifacts)
+        return not self.parameters or not self.artifacts
 
 
 class Context(NamedTuple):
