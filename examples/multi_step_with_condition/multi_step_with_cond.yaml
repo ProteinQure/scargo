@@ -106,7 +106,7 @@ spec:
         image: python:alpine
         command: [python]
         source: |
-          result = "{{inputs.parameters.init-value}})" + "b"
+          result = str("{{inputs.parameters.init-value}}") + "b"
           with open("{{outputs.artifacts.txt-out.path}}/add_beta_{{inputs.parameters.init-value}}.txt", "w+") as fi:
               fi.write(result)
 
