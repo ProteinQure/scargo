@@ -18,14 +18,14 @@ def mount_points_from_locals(script_locals: Dict[str, Any]) -> Dict[str, str]:
     Extract remote mount points from the MountPoints defined in Scargo.
     """
     raw_mount_points = [
-        {"var": var, "value": val} for var, val in script_locals.items() if isinstance(val, MountPoints)
+        {"var": var, "value": value} for var, value in script_locals.items() if isinstance(value, MountPoints)
     ]
     if len(raw_mount_points) == 0:
         raise ScargoTranspilerError("No mount points found.")
     elif len(raw_mount_points) > 1:
         raise ScargoTranspilerError("More than one MountPoints instance found.")
     else:
-        return {var: val.remote for var, val in raw_mount_points[0]["value"].items()}
+        return {var: value.remote for var, value in raw_mount_points[0]["value"].items()}
 
 
 def transpile_workflow_parameters(script_locals: Dict[str, Any]) -> WorkflowParams:
