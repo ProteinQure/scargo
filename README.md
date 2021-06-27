@@ -27,7 +27,7 @@ Using Scargo, scientists should be able to prototype and modify simple sequentia
 
 ## Features
 
-Almost all of these features have not been implemented yet.
+Almost all of these features have not been implemented yet. See `examples/` for practical demonstrations of features.
 
 ### Core
 
