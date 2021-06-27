@@ -16,7 +16,9 @@ Scargo is Argo for Scientific Workflows.
 
 A Scientific Workflow is a single-use workflow which takes statically defined inputs and outputs results. This is simpler than the CI/CD and event-driven workflows which Argo implements.
 
-This reduced scope allows Scargo to be implemented as a subset of Python which is compiled to Argo YAML. Using Python instead of YAML also provides additional benefits, such as as:
+This reduced scope allows Scargo to be implemented as a subset of Python. This Python subset can be run/tested locally, before transpiling to Argo Workflow's YAML to run on a cluster.
+
+Using Python instead of YAML also provides additional benefits, such as as:
 
 - Access to Python tooling, such as linting, auto-formatting and auto-completion
 - Less nesting and more brevity than YAML
@@ -31,9 +33,9 @@ Almost all of these features have not been implemented yet. See `examples/` for 
 
 ### Core
 
-- Run Python functions locally and allow for unit testing before bundling in Argo
-- Run Bash scripts defined outside of the main script
-- Define global parameters such they can separated out in the compiled Argo workflow
+- Run Python functions locally, allowing for unit testing before running with Argo
+- Run steps defined as Bash scripts
+- Define global workflow parameters such they can separated out in the compiled Argo workflow
 - Import common Argo functionality (iterating through a CSV, iterating through all files in an S3 folder)
 - Manage artifacts and parameters for individual steps with minimal boilerplate
 - Provide a YAML escape hatch
